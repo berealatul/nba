@@ -1,3 +1,4 @@
+```mermaid
 flowchart TD
 
     A[System Start] --> B[User Authentication]
@@ -166,3 +167,4 @@ flowchart TD
     style F fill:#fff3e0
     style G fill:#f3e5f5
     style H fill:#e1f5fe
+```
