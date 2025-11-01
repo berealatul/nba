@@ -131,7 +131,7 @@ export function DotPattern({
 					/>
 				</radialGradient>
 			</defs>
-			{dots.map((dot, index) => (
+			{dots.map((dot) => (
 				<motion.circle
 					key={`${dot.x}-${dot.y}`}
 					cx={dot.x}

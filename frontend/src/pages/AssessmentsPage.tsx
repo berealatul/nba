@@ -249,7 +249,7 @@ export function AssessmentsPage() {
 																  "Select Course"
 																: "Select Course"}
 														</span>
-														<ChevronDown className="h-4 w-4 opacity-50 ml-2 flex-shrink-0" />
+														<ChevronDown className="h-4 w-4 opacity-50 ml-2 shrink-0" />
 													</Button>
 												</DropdownMenuTrigger>
 												<DropdownMenuContent className="w-[400px]">
@@ -294,7 +294,7 @@ export function AssessmentsPage() {
 															{selectedTest ||
 																"Select Test"}
 														</span>
-														<ChevronDown className="h-4 w-4 opacity-50 ml-2 flex-shrink-0" />
+														<ChevronDown className="h-4 w-4 opacity-50 ml-2 shrink-0" />
 													</Button>
 												</DropdownMenuTrigger>
 												<DropdownMenuContent className="w-[200px]">
