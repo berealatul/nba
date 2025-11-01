@@ -11,12 +11,19 @@ require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/UserRepository.php';
 require_once __DIR__ . '/../models/Department.php';
 require_once __DIR__ . '/../models/DepartmentRepository.php';
+require_once __DIR__ . '/../models/Course.php';
+require_once __DIR__ . '/../models/CourseRepository.php';
+require_once __DIR__ . '/../models/Test.php';
+require_once __DIR__ . '/../models/TestRepository.php';
+require_once __DIR__ . '/../models/Question.php';
+require_once __DIR__ . '/../models/QuestionRepository.php';
 require_once __DIR__ . '/../utils/JWTService.php';
 require_once __DIR__ . '/../utils/AuthService.php';
 require_once __DIR__ . '/../middleware/AuthMiddleware.php';
 require_once __DIR__ . '/../middleware/ValidationMiddleware.php';
 require_once __DIR__ . '/../middleware/CorsMiddleware.php';
 require_once __DIR__ . '/../controllers/UserController.php';
+require_once __DIR__ . '/../controllers/AssessmentController.php';
 
 /**
  * Router Class
@@ -27,6 +34,7 @@ class Router
     private $corsMiddleware;
     private $authMiddleware;
     private $userController;
+    private $assessmentController;
 
     public function __construct()
     {
@@ -37,6 +45,9 @@ class Router
         // Initialize repositories and services
         $userRepository = new UserRepository($db);
         $departmentRepository = new DepartmentRepository($db);
+        $courseRepository = new CourseRepository($db);
+        $testRepository = new TestRepository($db);
+        $questionRepository = new QuestionRepository($db);
         $jwtService = new JWTService();
         $authService = new AuthService($userRepository, $jwtService, $departmentRepository);
 
@@ -49,6 +60,7 @@ class Router
 
         // Initialize controllers
         $this->userController = new UserController($authService, $userRepository, $departmentRepository, $validationMiddleware);
+        $this->assessmentController = new AssessmentController($courseRepository, $testRepository, $questionRepository, $validationMiddleware);
     }
 
     /**
@@ -112,6 +124,40 @@ class Router
                     $user = $this->authMiddleware->requireAuth();
                     $_REQUEST['authenticated_user'] = $user;
                     $this->userController->getDepartmentByEmployeeId();
+                } else {
+                    $this->sendMethodNotAllowed();
+                }
+                break;
+
+            case 'courses':
+                if ($method === 'GET') {
+                    $user = $this->authMiddleware->requireAuth();
+                    $_REQUEST['authenticated_user'] = $user;
+                    $this->assessmentController->getFacultyCourses();
+                } else {
+                    $this->sendMethodNotAllowed();
+                }
+                break;
+
+            case 'assessment':
+                if ($method === 'POST') {
+                    $user = $this->authMiddleware->requireAuth();
+                    $_REQUEST['authenticated_user'] = $user;
+                    $this->assessmentController->createAssessment();
+                } elseif ($method === 'GET') {
+                    $user = $this->authMiddleware->requireAuth();
+                    $_REQUEST['authenticated_user'] = $user;
+                    $this->assessmentController->getAssessment();
+                } else {
+                    $this->sendMethodNotAllowed();
+                }
+                break;
+
+            case 'course-tests':
+                if ($method === 'GET') {
+                    $user = $this->authMiddleware->requireAuth();
+                    $_REQUEST['authenticated_user'] = $user;
+                    $this->assessmentController->getCourseTests();
                 } else {
                     $this->sendMethodNotAllowed();
                 }

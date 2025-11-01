@@ -151,6 +151,105 @@
       ]
     },
     {
+      "name": "Assessment",
+      "item": [
+        {
+          "name": "Get Faculty Courses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courses",
+              "host": ["{{base_url}}"],
+              "path": ["courses"]
+            },
+            "description": "Get all courses assigned to the authenticated faculty member. Includes year and semester for each course - frontend can filter as needed."
+          }
+        },
+        {
+          "name": "Create Assessment (Test + Questions)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": 1,\n  \"name\": \"Mid Semester Examination\",\n  \"full_marks\": 50,\n  \"pass_marks\": 20,\n  \"question_link\": \"https://example.com/questions/mid-sem.pdf\",\n  \"questions\": [\n    {\n      \"question_number\": 1,\n      \"co\": 1,\n      \"max_marks\": 5,\n      \"description\": \"Define data structures\"\n    },\n    {\n      \"question_number\": 2,\n      \"sub_question\": \"a\",\n      \"co\": 2,\n      \"max_marks\": 3,\n      \"description\": \"Explain arrays\"\n    },\n    {\n      \"question_number\": 2,\n      \"sub_question\": \"b\",\n      \"co\": 2,\n      \"max_marks\": 3,\n      \"description\": \"Explain linked lists\"\n    },\n    {\n      \"question_number\": 5,\n      \"sub_question\": \"a\",\n      \"is_optional\": true,\n      \"co\": 3,\n      \"max_marks\": 10,\n      \"description\": \"Write algorithm for sorting (Attempt either 5a OR 5b)\"\n    },\n    {\n      \"question_number\": 5,\n      \"sub_question\": \"b\",\n      \"is_optional\": true,\n      \"co\": 3,\n      \"max_marks\": 10,\n      \"description\": \"Write algorithm for searching (Attempt either 5a OR 5b)\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/assessment",
+              "host": ["{{base_url}}"],
+              "path": ["assessment"]
+            },
+            "description": "Create a new test with questions mapped to Course Outcomes (CO 1-6). Sum of question marks must equal full_marks."
+          }
+        },
+        {
+          "name": "Get Assessment Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/assessment?test_id=1",
+              "host": ["{{base_url}}"],
+              "path": ["assessment"],
+              "query": [
+                {
+                  "key": "test_id",
+                  "value": "1",
+                  "description": "Test ID to retrieve"
+                }
+              ]
+            },
+            "description": "Get complete details of a test including questions and course information"
+          }
+        },
+        {
+          "name": "Get Course Tests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/course-tests?course_id=1",
+              "host": ["{{base_url}}"],
+              "path": ["course-tests"],
+              "query": [
+                {
+                  "key": "course_id",
+                  "value": "1",
+                  "description": "Course ID to get tests for"
+                }
+              ]
+            },
+            "description": "Get all tests for a specific course"
+          }
+        }
+      ]
+    },
+    {
       "name": "Test Cases",
       "item": [
         {
@@ -212,6 +311,58 @@
               "path": ["profile"]
             },
             "description": "Test profile update with invalid data"
+          }
+        },
+        {
+          "name": "Create Assessment - Invalid CO",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": 1,\n  \"name\": \"Test with Invalid CO\",\n  \"full_marks\": 50,\n  \"pass_marks\": 20,\n  \"questions\": [\n    {\n      \"co\": 7,\n      \"max_marks\": 50\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/assessment",
+              "host": ["{{base_url}}"],
+              "path": ["assessment"]
+            },
+            "description": "Test creating assessment with CO > 6 (should fail)"
+          }
+        },
+        {
+          "name": "Create Assessment - Marks Mismatch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": 1,\n  \"name\": \"Test with Marks Mismatch\",\n  \"full_marks\": 50,\n  \"pass_marks\": 20,\n  \"questions\": [\n    {\n      \"co\": 1,\n      \"max_marks\": 30\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/assessment",
+              "host": ["{{base_url}}"],
+              "path": ["assessment"]
+            },
+            "description": "Test creating assessment where question marks don't sum to full_marks (should fail)"
           }
         }
       ]

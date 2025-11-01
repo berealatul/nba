@@ -1,31 +1,24 @@
 -- =============================================
--- NBA PROJECT: FULL DATABASE (ENGINEERING ONLY)
+-- NBA DATABASE SCHEMA
 -- Database: nba_db
--- Scope: School of Engineering
+-- Purpose: Manage courses, tests, and CO-based assessments
 -- =============================================
--- Drop and recreate database
 DROP DATABASE IF EXISTS `nba_db`;
 CREATE DATABASE `nba_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `nba_db`;
 -- =============================================
--- TABLE: departments (Only Engineering)
+-- TABLES
 -- =============================================
-DROP TABLE IF EXISTS `departments`;
+-- Departments
 CREATE TABLE `departments` (
     `department_id` INT(11) NOT NULL AUTO_INCREMENT,
     `department_name` VARCHAR(100) NOT NULL,
     `department_code` VARCHAR(10) NOT NULL,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`department_id`),
-    UNIQUE KEY `uq_dept_name` (`department_name`),
-    UNIQUE KEY `uq_dept_code` (`department_code`),
-    INDEX `idx_dept_code` (`department_code`)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
--- =============================================
--- TABLE: users
--- =============================================
-DROP TABLE IF EXISTS `users`;
+    UNIQUE KEY (`department_name`),
+    UNIQUE KEY (`department_code`)
+);
+-- Users (Admin, HOD, Faculty, Staff)
 CREATE TABLE `users` (
     `employee_id` INT(11) NOT NULL,
     `username` VARCHAR(64) NOT NULL,
@@ -33,18 +26,68 @@ CREATE TABLE `users` (
     `password` VARCHAR(255) NOT NULL,
     `role` ENUM('admin', 'dean', 'hod', 'faculty', 'staff') NOT NULL,
     `department_id` INT(11) NULL,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`employee_id`),
-    UNIQUE KEY `uq_email` (`email`),
-    INDEX `idx_role` (`role`),
-    INDEX `idx_dept` (`department_id`),
-    CONSTRAINT `fk_user_dept` FOREIGN KEY (`department_id`) REFERENCES `departments`(`department_id`) ON DELETE
+    UNIQUE KEY (`email`),
+    INDEX (`department_id`),
+    FOREIGN KEY (`department_id`) REFERENCES `departments`(`department_id`) ON DELETE
     SET NULL
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+);
+-- Courses
+CREATE TABLE `course` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `course_code` VARCHAR(20) NOT NULL,
+    `name` VARCHAR(255) NOT NULL,
+    `credit` SMALLINT NOT NULL DEFAULT 0,
+    `syllabus` VARCHAR(500),
+    `faculty_id` INT(11) NOT NULL,
+    `year` INT NOT NULL CHECK (
+        `year` BETWEEN 1000 AND 9999
+    ),
+    `semester` INT NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY (`course_code`),
+    INDEX (`faculty_id`),
+    INDEX (`year`, `semester`),
+    FOREIGN KEY (`faculty_id`) REFERENCES `users`(`employee_id`) ON DELETE RESTRICT
+);
+-- Tests/Assessments
+CREATE TABLE `test` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `course_id` BIGINT NOT NULL,
+    `name` VARCHAR(255) NOT NULL,
+    `full_marks` INT NOT NULL CHECK (`full_marks` > 0),
+    `pass_marks` INT NOT NULL CHECK (`pass_marks` >= 0),
+    `question_link` VARCHAR(500),
+    PRIMARY KEY (`id`),
+    INDEX (`course_id`),
+    FOREIGN KEY (`course_id`) REFERENCES `course`(`id`) ON DELETE CASCADE
+);
+-- Questions (supports main question, sub-questions, optional)
+CREATE TABLE `question` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `test_id` BIGINT NOT NULL,
+    `question_number` SMALLINT NOT NULL CHECK (
+        `question_number` BETWEEN 1 AND 20
+    ),
+    `sub_question` VARCHAR(10) DEFAULT NULL,
+    -- a-h or NULL
+    `is_optional` BOOLEAN DEFAULT FALSE,
+    -- for "Attempt either A OR B"
+    `co` SMALLINT NOT NULL CHECK (
+        `co` BETWEEN 1 AND 6
+    ),
+    `max_marks` DECIMAL(5, 2) NOT NULL CHECK (`max_marks` >= 0.5),
+    `description` TEXT DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    INDEX (`test_id`),
+    INDEX (`test_id`, `question_number`),
+    UNIQUE KEY (`test_id`, `question_number`, `sub_question`),
+    FOREIGN KEY (`test_id`) REFERENCES `test`(`id`) ON DELETE CASCADE
+);
 -- =============================================
--- INSERT: Engineering Departments Only
+-- SAMPLE DATA
 -- =============================================
+-- Departments
 INSERT INTO `departments` (`department_name`, `department_code`)
 VALUES ('Computer Science & Engineering', 'CSE'),
     ('Electronics & Communication Engineering', 'ECE'),
@@ -53,22 +96,8 @@ VALUES ('Computer Science & Engineering', 'CSE'),
     ('Civil Engineering', 'CE'),
     ('Food Engineering & Technology', 'FET'),
     ('Energy', 'ENE');
--- =============================================
--- INSERT: Users
--- 1. Admin (admin123)
--- 2. HODs (password123)
--- 3. Faculty (password123)
--- 4. Staff (password123)
--- =============================================
--- ADMIN
-INSERT INTO `users` (
-        `employee_id`,
-        `username`,
-        `email`,
-        `password`,
-        `role`,
-        `department_id`
-    )
+-- Admin (password: admin123)
+INSERT INTO `users`
 VALUES (
         1001,
         'System Administrator',
@@ -77,15 +106,8 @@ VALUES (
         'admin',
         NULL
     );
--- HODs (Real HODs with exact email)
-INSERT INTO `users` (
-        `employee_id`,
-        `username`,
-        `email`,
-        `password`,
-        `role`,
-        `department_id`
-    )
+-- HODs (password: password123)
+INSERT INTO `users`
 VALUES (
         2001,
         'Prof. Kamal Uddin Ahmed',
@@ -94,7 +116,6 @@ VALUES (
         'hod',
         1
     ),
-    -- CSE
     (
         2002,
         'Prof. Santanu Sharma',
@@ -103,7 +124,6 @@ VALUES (
         'hod',
         2
     ),
-    -- ECE
     (
         2003,
         'Prof. Partha Pratim Dutta',
@@ -112,7 +132,6 @@ VALUES (
         'hod',
         4
     ),
-    -- ME
     (
         2004,
         'Prof. Karobi Saikia',
@@ -121,7 +140,6 @@ VALUES (
         'hod',
         5
     ),
-    -- CE
     (
         2005,
         'Prof. Madhumita Barbora',
@@ -130,18 +148,9 @@ VALUES (
         'hod',
         6
     );
--- FET
--- FACULTY (Real names & emails from Engineering depts)
-INSERT INTO `users` (
-        `employee_id`,
-        `username`,
-        `email`,
-        `password`,
-        `role`,
-        `department_id`
-    )
-VALUES -- CSE
-    (
+-- Faculty (password: password123)
+INSERT INTO `users`
+VALUES (
         3001,
         'Dr. Nityananda Sarma',
         'nityananda@tezu.ernet.in',
@@ -173,7 +182,6 @@ VALUES -- CSE
         'faculty',
         1
     ),
-    -- ECE
     (
         3005,
         'Dr. Bhabesh Deka',
@@ -190,7 +198,6 @@ VALUES -- CSE
         'faculty',
         2
     ),
-    -- MECHANICAL
     (
         3007,
         'Dr. Tapan Kumar Gogoi',
@@ -215,7 +222,6 @@ VALUES -- CSE
         'faculty',
         4
     ),
-    -- CIVIL
     (
         3010,
         'Dr. Manash Jyoti Dutta',
@@ -232,7 +238,6 @@ VALUES -- CSE
         'faculty',
         5
     ),
-    -- FET
     (
         3012,
         'Dr. Charu Lata Mahanta',
@@ -249,7 +254,6 @@ VALUES -- CSE
         'faculty',
         6
     ),
-    -- ENERGY
     (
         3014,
         'Dr. Rupam Kataki',
@@ -266,15 +270,8 @@ VALUES -- CSE
         'faculty',
         7
     );
--- STAFF (Administration/Technical)
-INSERT INTO `users` (
-        `employee_id`,
-        `username`,
-        `email`,
-        `password`,
-        `role`,
-        `department_id`
-    )
+-- Staff
+INSERT INTO `users`
 VALUES (
         4001,
         'Mr. Biren Das',
@@ -298,4 +295,86 @@ VALUES (
         '$2y$10$nlejuSHfBoAun490JDUHCuB4ZudU/4YR7eSh0OGuCV50poRy1NGUe',
         'staff',
         NULL
+    );
+-- Courses
+INSERT INTO `course`
+VALUES (
+        1,
+        'CS101',
+        'Introduction to Programming',
+        4,
+        NULL,
+        3001,
+        1,
+        1
+    ),
+    (
+        2,
+        'CS201',
+        'Data Structures and Algorithms',
+        4,
+        NULL,
+        3001,
+        2,
+        1
+    ),
+    (
+        3,
+        'CS301',
+        'Database Management Systems',
+        3,
+        NULL,
+        3002,
+        3,
+        1
+    ),
+    (
+        4,
+        'CS302',
+        'Computer Networks',
+        3,
+        NULL,
+        3004,
+        3,
+        2
+    ),
+    (
+        5,
+        'EC201',
+        'Digital Electronics',
+        4,
+        NULL,
+        3005,
+        2,
+        1
+    ),
+    (
+        6,
+        'EC301',
+        'Microprocessors',
+        3,
+        NULL,
+        3006,
+        3,
+        1
+    ),
+    (
+        7,
+        'ME201',
+        'Thermodynamics',
+        4,
+        NULL,
+        3007,
+        2,
+        1
+    ),
+    (
+        8,
+        'ME301',
+        'Fluid Mechanics',
+        3,
+        NULL,
+        3008,
+        3,
+        1
     );
