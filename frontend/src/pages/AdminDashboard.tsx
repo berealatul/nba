@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
 	Card,
 	CardContent,
@@ -163,13 +164,15 @@ const navItems: NavItem[] = [
 	{ id: "analytics", label: "Analytics", icon: BarChart3 },
 ];
 
-interface AdminDashboardProps {
-	onLogout: () => void;
-}
-
-export function AdminDashboard({ onLogout }: AdminDashboardProps) {
+export function AdminDashboard() {
 	const [activeNav, setActiveNav] = useState("dashboard");
 	const [sidebarOpen, setSidebarOpen] = useState(true);
+	const navigate = useNavigate();
+
+	const handleLogout = () => {
+		// Clear any auth tokens/session data here
+		navigate("/login");
+	};
 
 	return (
 		<div className="flex h-screen bg-gray-50 dark:bg-gray-950">
@@ -224,7 +227,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 								<span>Settings</span>
 							</button>
 							<button
-								onClick={onLogout}
+								onClick={handleLogout}
 								className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-all"
 							>
 								<LogOut className="w-5 h-5" />
