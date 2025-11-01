@@ -1,27 +1,18 @@
-import { useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
-import { LoginPage } from "./components/LoginPage";
-import { AdminDashboard } from "./components/AdminDashboard";
+import { LoginPage } from "./pages/LoginPage";
+import { AdminDashboard } from "./pages/AdminDashboard";
 
 function App() {
-	const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-	const handleLogin = () => {
-		setIsLoggedIn(true);
-	};
-
-	const handleLogout = () => {
-		setIsLoggedIn(false);
-	};
-
 	return (
-		<>
-			{!isLoggedIn ? (
-				<LoginPage onLogin={handleLogin} />
-			) : (
-				<AdminDashboard onLogout={handleLogout} />
-			)}
-		</>
+		<BrowserRouter>
+			<Routes>
+				<Route path="/login" element={<LoginPage />} />
+				<Route path="/dashboard" element={<AdminDashboard />} />
+				<Route path="/" element={<Navigate to="/login" replace />} />
+				<Route path="*" element={<Navigate to="/login" replace />} />
+			</Routes>
+		</BrowserRouter>
 	);
 }
 
