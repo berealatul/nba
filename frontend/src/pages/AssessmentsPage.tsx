@@ -330,18 +330,18 @@ export function AssessmentsPage() {
 										sub-question
 									</CardDescription>
 								</CardHeader>
-								<CardContent>
-									<div className="overflow-x-auto">
-										<Table>
+								<CardContent className="p-0">
+									<div className="overflow-x-auto max-w-full">
+										<Table className="w-max min-w-full">
 											<TableHeader>
 												<TableRow>
-													<TableHead className="text-gray-700 dark:text-gray-300 font-bold w-24">
+													<TableHead className="text-gray-700 dark:text-gray-300 font-bold w-20 sticky left-0 bg-white dark:bg-gray-900 z-10">
 														Question
 													</TableHead>
 													{SUB_QUESTIONS.map((sq) => (
 														<TableHead
 															key={sq}
-															className="text-center text-gray-700 dark:text-gray-300 font-bold"
+															className="text-center text-gray-700 dark:text-gray-300 font-bold w-24"
 														>
 															{sq.toUpperCase()}
 														</TableHead>
@@ -351,7 +351,7 @@ export function AssessmentsPage() {
 											<TableBody>
 												{QUESTIONS.map((qNum) => (
 													<TableRow key={qNum}>
-														<TableCell className="font-bold text-gray-900 dark:text-white">
+														<TableCell className="font-bold text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-gray-900 z-10">
 															Q{qNum}
 														</TableCell>
 														{SUB_QUESTIONS.map(
@@ -366,15 +366,15 @@ export function AssessmentsPage() {
 																		>
 																			<Button
 																				variant="outline"
-																				className="w-28 justify-between text-gray-900 dark:text-white border-gray-300 dark:border-gray-700"
+																				className="w-20 justify-between text-gray-900 dark:text-white border-gray-300 dark:border-gray-700 text-xs"
 																			>
-																				<span className="text-sm">
+																				<span className="text-xs truncate">
 																					{getCOValue(
 																						qNum,
 																						sq
 																					)}
 																				</span>
-																				<ChevronDown className="h-4 w-4 opacity-50" />
+																				<ChevronDown className="h-3 w-3 opacity-50 ml-1" />
 																			</Button>
 																		</DropdownMenuTrigger>
 																		<DropdownMenuContent className="w-28">
@@ -428,7 +428,7 @@ export function AssessmentsPage() {
 							</Card>
 
 							{/* Save Button */}
-							<div className="mt-6 flex justify-end">
+							<div className="mt-6 flex justify-end px-6 pb-6">
 								<Button
 									size="lg"
 									className="bg-blue-600 hover:bg-blue-700 text-white"
