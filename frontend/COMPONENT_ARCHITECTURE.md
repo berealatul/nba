@@ -79,129 +79,162 @@ App.tsx (Root)
 ## Component Details
 
 ### 1. LoginPage Component
+
 **Purpose**: Authentication interface  
 **Props**: `onLogin: () => void`  
-**State**: 
-- `email: string`
-- `password: string`
+**State**:
+
+-   `email: string`
+-   `password: string`
 
 **Children**:
-- Card (form container)
-- Input × 2 (email, password)
-- Label × 2
-- ShimmerButton (submit)
-- Button × 3 (social login)
-- DotPattern (background)
-- AnimatedThemeToggler
+
+-   Card (form container)
+-   Input × 2 (email, password)
+-   Label × 2
+-   ShimmerButton (submit)
+-   Button × 3 (social login)
+-   DotPattern (background)
+-   AnimatedThemeToggler
 
 ### 2. AdminDashboard Component
+
 **Purpose**: Main dashboard interface  
 **Props**: `onLogout: () => void`  
 **State**:
-- `activeNav: string` (current nav item)
-- `sidebarOpen: boolean` (sidebar visibility)
+
+-   `activeNav: string` (current nav item)
+-   `sidebarOpen: boolean` (sidebar visibility)
 
 **Sections**:
-- **Sidebar** (280px width, collapsible)
-- **Header** (64px height, fixed)
-- **Content** (flexible, scrollable)
+
+-   **Sidebar** (280px width, collapsible)
+-   **Header** (64px height, fixed)
+-   **Content** (flexible, scrollable)
 
 ### 3. Stats Cards (4 cards)
+
 **Structure**: Card → CardHeader → CardContent  
 **Features**:
-- Gradient backgrounds (blue, purple, green, orange)
-- Icon in header
-- NumberTicker for animated values
-- Growth indicators
+
+-   Gradient backgrounds (blue, purple, green, orange)
+-   Icon in header
+-   NumberTicker for animated values
+-   Growth indicators
 
 **Data**:
-- Total Users: 42
-- Total Courses: 28
-- Total Students: 350
-- Total Assessments: 156
+
+-   Total Users: 42
+-   Total Courses: 28
+-   Total Students: 350
+-   Total Assessments: 156
 
 ### 4. Data Tables (3 tables)
 
 #### Recent Courses Table
+
 **Columns**: Code, Name, Credits, Faculty  
 **Rows**: 5  
 **Special**: Badge for credits
 
 #### Recent Students Table
+
 **Columns**: Roll No, Name, Dept, Programme  
 **Rows**: 5  
 **Special**: Badge for department
 
 #### Recent Assessments Table
+
 **Columns**: Student, Course, Marks, Grade  
 **Rows**: 5  
-**Special**: 
-- Progress bar for marks
-- Color-coded badge for grades
+**Special**:
+
+-   Progress bar for marks
+-   Color-coded badge for grades
 
 ## UI Component Library Usage
 
 ### From ShadCn UI
+
 ```typescript
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 ```
 
 ### From Magic UI
+
 ```typescript
-import { ShimmerButton } from "@/components/ui/shimmer-button"
-import { DotPattern } from "@/components/ui/dot-pattern"
-import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
-import { NumberTicker } from "@/components/ui/number-ticker"
+import { ShimmerButton } from "@/components/ui/shimmer-button";
+import { DotPattern } from "@/components/ui/dot-pattern";
+import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
+import { NumberTicker } from "@/components/ui/number-ticker";
 ```
 
 ### From Lucide Icons
+
 ```typescript
 import {
-  LayoutDashboard,
-  Users,
-  BookOpen,
-  GraduationCap,
-  ClipboardList,
-  FileText,
-  BarChart3,
-  Settings,
-  LogOut,
-  Menu,
-  X
-} from "lucide-react"
+	LayoutDashboard,
+	Users,
+	BookOpen,
+	GraduationCap,
+	ClipboardList,
+	FileText,
+	BarChart3,
+	Settings,
+	LogOut,
+	Menu,
+	X,
+} from "lucide-react";
 ```
 
 ## State Management
 
 ### App Level
+
 ```typescript
-const [isLoggedIn, setIsLoggedIn] = useState(false)
+const [isLoggedIn, setIsLoggedIn] = useState(false);
 ```
 
 ### LoginPage
+
 ```typescript
-const [email, setEmail] = useState("")
-const [password, setPassword] = useState("")
+const [email, setEmail] = useState("");
+const [password, setPassword] = useState("");
 ```
 
 ### AdminDashboard
+
 ```typescript
-const [activeNav, setActiveNav] = useState("dashboard")
-const [sidebarOpen, setSidebarOpen] = useState(true)
+const [activeNav, setActiveNav] = useState("dashboard");
+const [sidebarOpen, setSidebarOpen] = useState(true);
 ```
 
 ### ThemeProvider (Global)
+
 ```typescript
-type Theme = "dark" | "light" | "system"
-const [theme, setTheme] = useState<Theme>()
+type Theme = "dark" | "light" | "system";
+const [theme, setTheme] = useState<Theme>();
 // Persisted in localStorage as "nba-ui-theme"
 ```
 
@@ -228,6 +261,7 @@ Examples:
 ## Styling System
 
 ### Tailwind CSS Classes
+
 ```css
 /* Gradients */
 bg-linear-to-br from-blue-500 to-blue-600
@@ -243,6 +277,7 @@ transition-all duration-300 ease-in-out
 ```
 
 ### CSS Variables
+
 ```css
 /* Theme colors stored in :root */
 --primary, --secondary, --background, --foreground, etc.
@@ -251,16 +286,18 @@ transition-all duration-300 ease-in-out
 ## Animation System
 
 ### Framer Motion
-- **AnimatedThemeToggler**: Circular transition effect
-- **DotPattern**: SVG dot animation
-- **ShimmerButton**: Shimmer slide animation
-- **NumberTicker**: Count-up animation with spring physics
+
+-   **AnimatedThemeToggler**: Circular transition effect
+-   **DotPattern**: SVG dot animation
+-   **ShimmerButton**: Shimmer slide animation
+-   **NumberTicker**: Count-up animation with spring physics
 
 ### CSS Animations
-- Sidebar slide in/out
-- Button hover effects
-- Card hover shadows
-- Progress bar fills
+
+-   Sidebar slide in/out
+-   Button hover effects
+-   Card hover shadows
+-   Progress bar fills
 
 ## Responsive Breakpoints
 
@@ -273,13 +310,15 @@ xl: 1280px  /* Extra large devices */
 ```
 
 ### Responsive Behavior
-- **Mobile** (< 768px): Sidebar collapsed by default
-- **Tablet** (768px - 1024px): Collapsible sidebar
-- **Desktop** (> 1024px): Full sidebar visible
+
+-   **Mobile** (< 768px): Sidebar collapsed by default
+-   **Tablet** (768px - 1024px): Collapsible sidebar
+-   **Desktop** (> 1024px): Full sidebar visible
 
 ## Database Schema Mapping
 
 ### Dummy Data Structure
+
 ```typescript
 // Courses
 {
