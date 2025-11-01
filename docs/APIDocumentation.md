@@ -616,6 +616,275 @@ GET /course-tests?course_id=1
 
 ---
 
+### 10. Save Marks by Question
+
+**Endpoint:** `POST /marks/by-question`
+
+**Description:** Save marks per question for a student in a test. Automatically calculates CO-aggregated totals and stores them in the marks table.
+
+**Authentication:** Required (Faculty only)
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "test_id": 1,
+  "student_id": "CS101",
+  "marks": [
+    {
+      "question_identifier": "1",
+      "marks": 5
+    },
+    {
+      "question_identifier": "2a",
+      "marks": 3
+    },
+    {
+      "question_identifier": "2b",
+      "marks": 2.5
+    },
+    {
+      "question_identifier": "5a",
+      "marks": 8
+    }
+  ]
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Marks saved successfully",
+  "data": {
+    "student_id": "CS101",
+    "test_id": 1,
+    "co_totals": {
+      "CO1": 5,
+      "CO2": 5.5,
+      "CO3": 8,
+      "CO4": 0,
+      "CO5": 0,
+      "CO6": 0
+    }
+  }
+}
+```
+
+**Validation Error Response (400):**
+```json
+{
+  "success": false,
+  "message": "Marks for question '2a' exceed maximum (3)"
+}
+```
+
+**Note:** 
+- Question identifiers match the format: `{question_number}` or `{question_number}{sub_question}` (e.g., "1", "2a", "5b")
+- Marks are validated against the max_marks for each question
+- CO totals are automatically calculated by summing marks for all questions mapped to each CO
+- Raw marks (per-question) and aggregated marks (per-CO) are both stored
+
+---
+
+### 11. Save Marks by CO
+
+**Endpoint:** `POST /marks/by-co`
+
+**Description:** Directly save CO-aggregated marks for a student. Use this when faculty manually calculates CO totals. Does NOT store per-question raw marks.
+
+**Authentication:** Required (Faculty only)
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "test_id": 1,
+  "student_id": "CS101",
+  "CO1": 10,
+  "CO2": 8.5,
+  "CO3": 15,
+  "CO4": 7,
+  "CO5": 0,
+  "CO6": 0
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Marks saved successfully",
+  "data": {
+    "id": 1,
+    "student_id": "CS101",
+    "test_id": 1,
+    "CO1": 10,
+    "CO2": 8.5,
+    "CO3": 15,
+    "CO4": 7,
+    "CO5": 0,
+    "CO6": 0
+  }
+}
+```
+
+**Note:**
+- All CO values default to 0 if not provided
+- CO marks must be non-negative
+- Useful when faculty has already grouped marks by CO manually
+- No per-question data stored in rawMarks table
+
+---
+
+### 12. Get Student Marks
+
+**Endpoint:** `GET /marks`
+
+**Description:** Get marks (both raw per-question and CO-aggregated) for a specific student in a test.
+
+**Authentication:** Required
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Query Parameters:**
+- `test_id` (required): Test ID
+- `student_id` (required): Student roll number
+
+**Example Request:**
+```
+GET /marks?test_id=1&student_id=CS101
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "marks": {
+      "id": 1,
+      "student_id": "CS101",
+      "test_id": 1,
+      "CO1": 5,
+      "CO2": 5.5,
+      "CO3": 8,
+      "CO4": 0,
+      "CO5": 0,
+      "CO6": 0
+    },
+    "raw_marks": [
+      {
+        "question_identifier": "1",
+        "marks": 5,
+        "co": 1
+      },
+      {
+        "question_identifier": "2a",
+        "marks": 3,
+        "co": 2
+      },
+      {
+        "question_identifier": "2b",
+        "marks": 2.5,
+        "co": 2
+      },
+      {
+        "question_identifier": "5a",
+        "marks": 8,
+        "co": 3
+      }
+    ]
+  }
+}
+```
+
+**Note:**
+- Returns `null` for `marks` if no CO-aggregated data exists
+- Returns empty array for `raw_marks` if no per-question data exists
+- Useful for viewing student's detailed performance
+
+---
+
+### 13. Get All Marks for a Test
+
+**Endpoint:** `GET /marks/test`
+
+**Description:** Get CO-aggregated marks for all students who have taken a specific test.
+
+**Authentication:** Required (Faculty only)
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Query Parameters:**
+- `test_id` (required): Test ID
+
+**Example Request:**
+```
+GET /marks/test?test_id=1
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "test": {
+      "id": 1,
+      "course_id": 1,
+      "name": "Mid Semester Examination",
+      "full_marks": 50,
+      "pass_marks": 20,
+      "question_link": "https://example.com/questions/mid-sem.pdf"
+    },
+    "marks": [
+      {
+        "student_id": "CS101",
+        "student_name": "Rajesh Kumar",
+        "CO1": 5,
+        "CO2": 5.5,
+        "CO3": 8,
+        "CO4": 0,
+        "CO5": 0,
+        "CO6": 0
+      },
+      {
+        "student_id": "CS102",
+        "student_name": "Priya Sharma",
+        "CO1": 4,
+        "CO2": 6,
+        "CO3": 9,
+        "CO4": 0,
+        "CO5": 0,
+        "CO6": 0
+      }
+    ]
+  }
+}
+```
+
+**Note:**
+- Returns only students who have marks saved
+- Useful for generating reports and analysis
+- Only shows CO-aggregated totals, not per-question breakdown
+
+---
+
 ## Data Models
 
 ### User Object
@@ -647,8 +916,8 @@ GET /course-tests?course_id=1
   "credit": "number (non-negative)",
   "syllabus": "string|null",
   "faculty_id": "number",
-  "year": "number (1-5)",
-  "semester": "number (1-2)"
+  "year": "number (4-digit calendar year: 1000-9999)",
+  "semester": "number (positive integer)"
 }
 ```
 
@@ -684,6 +953,41 @@ GET /course-tests?course_id=1
 - Sub-question: `{"question_number": 2, "sub_question": "a"}` → Identifier: `"2a"`
 - Optional question: `{"question_number": 5, "sub_question": "a", "is_optional": true}` → For "Attempt either 5a OR 5b" scenarios
 
+### Student Object
+```json
+{
+  "rollno": "string (primary key)",
+  "name": "string (max 100 characters)",
+  "dept": "number (department_id)"
+}
+```
+
+### RawMarks Object
+```json
+{
+  "id": "number",
+  "test_id": "number",
+  "student_id": "string (rollno)",
+  "question_id": "number",
+  "marks": "decimal (>= 0)"
+}
+```
+
+### Marks Object (CO-Aggregated)
+```json
+{
+  "id": "number",
+  "student_id": "string (rollno)",
+  "test_id": "number",
+  "CO1": "decimal (>= 0, default: 0)",
+  "CO2": "decimal (>= 0, default: 0)",
+  "CO3": "decimal (>= 0, default: 0)",
+  "CO4": "decimal (>= 0, default: 0)",
+  "CO5": "decimal (>= 0, default: 0)",
+  "CO6": "decimal (>= 0, default: 0)"
+}
+```
+
 ## Validation Rules
 
 ### Login Validation
@@ -703,8 +1007,8 @@ GET /course-tests?course_id=1
 - `credit`: Required, non-negative number
 - `syllabus`: Optional, text
 - `faculty_id`: Required, must be a valid faculty member
-- `year`: Required, must be between 1-5
-- `semester`: Required, must be 1 or 2
+- `year`: Required, must be a 4-digit calendar year (1000-9999)
+- `semester`: Required, must be a positive integer
 
 ### Test Validation
 - `course_id`: Required, must be a course assigned to the faculty
@@ -722,6 +1026,18 @@ GET /course-tests?course_id=1
 - `max_marks`: Required, must be >= 0.5 (supports decimals like 2.5)
 - `description`: Optional, question text
 - **No total marks validation** - System supports optional questions and flexible test structures
+
+### Marks Validation (by-question)
+- `test_id`: Required, must be a valid test
+- `student_id`: Required, must be a valid student rollno
+- `marks`: Required, array of per-question marks
+  - `question_identifier`: Required, must match existing question (e.g., "1", "2a", "5b")
+  - `marks`: Required, must be >= 0 and <= question's max_marks
+
+### Marks Validation (by-co)
+- `test_id`: Required, must be a valid test
+- `student_id`: Required, must be a valid student rollno
+- `CO1-CO6`: Optional, all must be >= 0 (default to 0 if not provided)
 
 ## User Roles
 

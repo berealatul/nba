@@ -106,16 +106,16 @@ class Course
 
     public function setYear($year)
     {
-        if (!is_numeric($year) || $year < 1 || $year > 5) {
-            throw new Exception("Year must be between 1 and 5");
+        if (!is_numeric($year) || $year < 1000 || $year > 9999) {
+            throw new Exception("Year must be a 4-digit calendar year (1000-9999)");
         }
         $this->year = (int)$year;
     }
 
     public function setSemester($semester)
     {
-        if (!is_numeric($semester) || $semester < 1 || $semester > 2) {
-            throw new Exception("Semester must be 1 or 2");
+        if (!is_numeric($semester) || $semester < 1) {
+            throw new Exception("Semester must be a positive integer");
         }
         $this->semester = (int)$semester;
     }

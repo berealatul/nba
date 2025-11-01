@@ -84,6 +84,47 @@ CREATE TABLE `question` (
     UNIQUE KEY (`test_id`, `question_number`, `sub_question`),
     FOREIGN KEY (`test_id`) REFERENCES `test`(`id`) ON DELETE CASCADE
 );
+-- Students
+CREATE TABLE `student` (
+    `rollno` VARCHAR(20) NOT NULL,
+    `name` VARCHAR(100) NOT NULL,
+    `dept` INT(11) NOT NULL,
+    PRIMARY KEY (`rollno`),
+    INDEX (`dept`),
+    FOREIGN KEY (`dept`) REFERENCES `departments`(`department_id`) ON DELETE RESTRICT
+);
+-- Raw Marks (per-question scores, dropped every semester)
+CREATE TABLE `rawMarks` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `test_id` BIGINT NOT NULL,
+    `student_id` VARCHAR(20) NOT NULL,
+    `question_id` BIGINT NOT NULL,
+    `marks` DECIMAL(5, 2) NOT NULL CHECK (`marks` >= 0),
+    PRIMARY KEY (`id`),
+    UNIQUE KEY (`test_id`, `student_id`, `question_id`),
+    INDEX (`test_id`, `student_id`),
+    INDEX (`student_id`),
+    FOREIGN KEY (`test_id`) REFERENCES `test`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`student_id`) REFERENCES `student`(`rollno`) ON DELETE CASCADE,
+    FOREIGN KEY (`question_id`) REFERENCES `question`(`id`) ON DELETE CASCADE
+);
+-- Marks (CO-aggregated scores per student per test)
+CREATE TABLE `marks` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `student_id` VARCHAR(20) NOT NULL,
+    `test_id` BIGINT NOT NULL,
+    `CO1` DECIMAL(6, 2) DEFAULT 0 CHECK (`CO1` >= 0),
+    `CO2` DECIMAL(6, 2) DEFAULT 0 CHECK (`CO2` >= 0),
+    `CO3` DECIMAL(6, 2) DEFAULT 0 CHECK (`CO3` >= 0),
+    `CO4` DECIMAL(6, 2) DEFAULT 0 CHECK (`CO4` >= 0),
+    `CO5` DECIMAL(6, 2) DEFAULT 0 CHECK (`CO5` >= 0),
+    `CO6` DECIMAL(6, 2) DEFAULT 0 CHECK (`CO6` >= 0),
+    PRIMARY KEY (`id`),
+    UNIQUE KEY (`student_id`, `test_id`),
+    INDEX (`test_id`),
+    FOREIGN KEY (`student_id`) REFERENCES `student`(`rollno`) ON DELETE CASCADE,
+    FOREIGN KEY (`test_id`) REFERENCES `test`(`id`) ON DELETE CASCADE
+);
 -- =============================================
 -- SAMPLE DATA
 -- =============================================
@@ -305,7 +346,7 @@ VALUES (
         4,
         NULL,
         3001,
-        1,
+        2024,
         1
     ),
     (
@@ -315,7 +356,7 @@ VALUES (
         4,
         NULL,
         3001,
-        2,
+        2024,
         1
     ),
     (
@@ -325,7 +366,7 @@ VALUES (
         3,
         NULL,
         3002,
-        3,
+        2024,
         1
     ),
     (
@@ -335,7 +376,7 @@ VALUES (
         3,
         NULL,
         3004,
-        3,
+        2024,
         2
     ),
     (
@@ -345,7 +386,7 @@ VALUES (
         4,
         NULL,
         3005,
-        2,
+        2025,
         1
     ),
     (
@@ -355,7 +396,7 @@ VALUES (
         3,
         NULL,
         3006,
-        3,
+        2025,
         1
     ),
     (
@@ -365,8 +406,8 @@ VALUES (
         4,
         NULL,
         3007,
-        2,
-        1
+        2025,
+        2
     ),
     (
         8,
@@ -375,6 +416,15 @@ VALUES (
         3,
         NULL,
         3008,
-        3,
-        1
+        2025,
+        2
     );
+-- Students
+INSERT INTO `student`
+VALUES ('CS101', 'Rajesh Kumar', 1),
+    ('CS102', 'Priya Sharma', 1),
+    ('CS103', 'Amit Patel', 1),
+    ('EC101', 'Sneha Das', 2),
+    ('EC102', 'Vikram Singh', 2),
+    ('ME101', 'Anita Roy', 4),
+    ('ME102', 'Suresh Yadav', 4);

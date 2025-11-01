@@ -250,6 +250,118 @@
       ]
     },
     {
+      "name": "Marks Management",
+      "item": [
+        {
+          "name": "Save Marks by Question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"test_id\": 1,\n  \"student_id\": \"CS101\",\n  \"marks\": [\n    {\n      \"question_identifier\": \"1\",\n      \"marks\": 5\n    },\n    {\n      \"question_identifier\": \"2a\",\n      \"marks\": 3\n    },\n    {\n      \"question_identifier\": \"2b\",\n      \"marks\": 2.5\n    },\n    {\n      \"question_identifier\": \"5a\",\n      \"marks\": 10\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/marks/by-question",
+              "host": ["{{base_url}}"],
+              "path": ["marks", "by-question"]
+            },
+            "description": "Save per-question marks for a student. System automatically calculates CO totals."
+          }
+        },
+        {
+          "name": "Save Marks by CO",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"test_id\": 1,\n  \"student_id\": \"CS102\",\n  \"CO1\": 10,\n  \"CO2\": 8.5,\n  \"CO3\": 15,\n  \"CO4\": 7,\n  \"CO5\": 0,\n  \"CO6\": 0\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/marks/by-co",
+              "host": ["{{base_url}}"],
+              "path": ["marks", "by-co"]
+            },
+            "description": "Directly save CO-aggregated marks for a student (manual entry method)"
+          }
+        },
+        {
+          "name": "Get Student Marks",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/marks?test_id=1&student_id=CS101",
+              "host": ["{{base_url}}"],
+              "path": ["marks"],
+              "query": [
+                {
+                  "key": "test_id",
+                  "value": "1",
+                  "description": "Test ID"
+                },
+                {
+                  "key": "student_id",
+                  "value": "CS101",
+                  "description": "Student Roll Number"
+                }
+              ]
+            },
+            "description": "Get both raw marks and CO-aggregated marks for a specific student"
+          }
+        },
+        {
+          "name": "Get All Test Marks",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/marks/test?test_id=1",
+              "host": ["{{base_url}}"],
+              "path": ["marks", "test"],
+              "query": [
+                {
+                  "key": "test_id",
+                  "value": "1",
+                  "description": "Test ID"
+                }
+              ]
+            },
+            "description": "Get CO-aggregated marks for all students in a test"
+          }
+        }
+      ]
+    },
+    {
       "name": "Test Cases",
       "item": [
         {

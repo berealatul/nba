@@ -45,7 +45,7 @@ class TestRepository
     public function findByCourseId($courseId)
     {
         try {
-            $stmt = $this->db->prepare("SELECT * FROM test WHERE course_id = ? ORDER BY created_at DESC");
+            $stmt = $this->db->prepare("SELECT * FROM test WHERE course_id = ? ORDER BY id DESC");
             $stmt->execute([$courseId]);
             $tests = [];
 

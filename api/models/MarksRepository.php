@@ -1,0 +1,129 @@
+<?php
+
+/**
+ * MarksRepository
+ * Handles database operations for Marks (CO-aggregated scores)
+ */
+class MarksRepository
+{
+    private $db;
+
+    public function __construct($db)
+    {
+        $this->db = $db;
+    }
+
+    /**
+     * Find marks by test and student
+     */
+    public function findByTestAndStudent($testId, $studentId)
+    {
+        $stmt = $this->db->prepare("SELECT * FROM marks WHERE test_id = ? AND student_id = ?");
+        $stmt->execute([$testId, $studentId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($row) {
+            return new Marks(
+                $row['student_id'],
+                $row['test_id'],
+                $row['CO1'],
+                $row['CO2'],
+                $row['CO3'],
+                $row['CO4'],
+                $row['CO5'],
+                $row['CO6'],
+                $row['id']
+            );
+        }
+        return null;
+    }
+
+    /**
+     * Find all marks for a test
+     */
+    public function findByTest($testId)
+    {
+        $stmt = $this->db->prepare("
+            SELECT m.*, s.name as student_name 
+            FROM marks m
+            JOIN student s ON m.student_id = s.rollno
+            WHERE m.test_id = ?
+            ORDER BY m.student_id
+        ");
+        $stmt->execute([$testId]);
+
+        $marksList = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $marks = new Marks(
+                $row['student_id'],
+                $row['test_id'],
+                $row['CO1'],
+                $row['CO2'],
+                $row['CO3'],
+                $row['CO4'],
+                $row['CO5'],
+                $row['CO6'],
+                $row['id']
+            );
+            $marksList[] = [
+                'marks' => $marks,
+                'student_name' => $row['student_name']
+            ];
+        }
+        return $marksList;
+    }
+
+    /**
+     * Save or update marks (upsert)
+     */
+    public function save(Marks $marks)
+    {
+        $stmt = $this->db->prepare("
+            INSERT INTO marks (student_id, test_id, CO1, CO2, CO3, CO4, CO5, CO6) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE 
+                CO1 = VALUES(CO1),
+                CO2 = VALUES(CO2),
+                CO3 = VALUES(CO3),
+                CO4 = VALUES(CO4),
+                CO5 = VALUES(CO5),
+                CO6 = VALUES(CO6)
+        ");
+
+        $result = $stmt->execute([
+            $marks->getStudentId(),
+            $marks->getTestId(),
+            $marks->getCO1(),
+            $marks->getCO2(),
+            $marks->getCO3(),
+            $marks->getCO4(),
+            $marks->getCO5(),
+            $marks->getCO6()
+        ]);
+
+        if ($result && $marks->getId() === null) {
+            $marks->setId($this->db->lastInsertId());
+        }
+
+        return $result;
+    }
+
+    /**
+     * Delete marks for a test and student
+     */
+    public function deleteByTestAndStudent($testId, $studentId)
+    {
+        $stmt = $this->db->prepare("DELETE FROM marks WHERE test_id = ? AND student_id = ?");
+        return $stmt->execute([$testId, $studentId]);
+    }
+
+    /**
+     * Check if marks exist
+     */
+    public function exists($testId, $studentId)
+    {
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM marks WHERE test_id = ? AND student_id = ?");
+        $stmt->execute([$testId, $studentId]);
+        return $stmt->fetchColumn() > 0;
+    }
+}

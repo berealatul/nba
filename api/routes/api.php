@@ -17,6 +17,12 @@ require_once __DIR__ . '/../models/Test.php';
 require_once __DIR__ . '/../models/TestRepository.php';
 require_once __DIR__ . '/../models/Question.php';
 require_once __DIR__ . '/../models/QuestionRepository.php';
+require_once __DIR__ . '/../models/Student.php';
+require_once __DIR__ . '/../models/StudentRepository.php';
+require_once __DIR__ . '/../models/RawMarks.php';
+require_once __DIR__ . '/../models/RawMarksRepository.php';
+require_once __DIR__ . '/../models/Marks.php';
+require_once __DIR__ . '/../models/MarksRepository.php';
 require_once __DIR__ . '/../utils/JWTService.php';
 require_once __DIR__ . '/../utils/AuthService.php';
 require_once __DIR__ . '/../middleware/AuthMiddleware.php';
@@ -24,6 +30,7 @@ require_once __DIR__ . '/../middleware/ValidationMiddleware.php';
 require_once __DIR__ . '/../middleware/CorsMiddleware.php';
 require_once __DIR__ . '/../controllers/UserController.php';
 require_once __DIR__ . '/../controllers/AssessmentController.php';
+require_once __DIR__ . '/../controllers/MarksController.php';
 
 /**
  * Router Class
@@ -35,6 +42,7 @@ class Router
     private $authMiddleware;
     private $userController;
     private $assessmentController;
+    private $marksController;
 
     public function __construct()
     {
@@ -48,6 +56,9 @@ class Router
         $courseRepository = new CourseRepository($db);
         $testRepository = new TestRepository($db);
         $questionRepository = new QuestionRepository($db);
+        $studentRepository = new StudentRepository($db);
+        $rawMarksRepository = new RawMarksRepository($db);
+        $marksRepository = new MarksRepository($db);
         $jwtService = new JWTService();
         $authService = new AuthService($userRepository, $jwtService, $departmentRepository);
 
@@ -61,6 +72,7 @@ class Router
         // Initialize controllers
         $this->userController = new UserController($authService, $userRepository, $departmentRepository, $validationMiddleware);
         $this->assessmentController = new AssessmentController($courseRepository, $testRepository, $questionRepository, $validationMiddleware);
+        $this->marksController = new MarksController($studentRepository, $rawMarksRepository, $marksRepository, $questionRepository, $testRepository, $validationMiddleware);
     }
 
     /**
@@ -86,6 +98,12 @@ class Router
 
         // Route requests
         switch ($path) {
+            case '':
+            case '/':
+                // Root endpoint - API info
+                $this->sendWelcome();
+                break;
+
             case 'login':
                 if ($method === 'POST') {
                     $this->userController->login();
@@ -163,10 +181,87 @@ class Router
                 }
                 break;
 
+            case 'marks/by-question':
+                if ($method === 'POST') {
+                    $user = $this->authMiddleware->requireAuth();
+                    $_REQUEST['authenticated_user'] = $user;
+                    $this->marksController->saveMarksByQuestion();
+                } else {
+                    $this->sendMethodNotAllowed();
+                }
+                break;
+
+            case 'marks/by-co':
+                if ($method === 'POST') {
+                    $user = $this->authMiddleware->requireAuth();
+                    $_REQUEST['authenticated_user'] = $user;
+                    $this->marksController->saveMarksByCO();
+                } else {
+                    $this->sendMethodNotAllowed();
+                }
+                break;
+
+            case 'marks':
+                if ($method === 'GET') {
+                    $user = $this->authMiddleware->requireAuth();
+                    $_REQUEST['authenticated_user'] = $user;
+                    $this->marksController->getMarks();
+                } else {
+                    $this->sendMethodNotAllowed();
+                }
+                break;
+
+            case 'marks/test':
+                if ($method === 'GET') {
+                    $user = $this->authMiddleware->requireAuth();
+                    $_REQUEST['authenticated_user'] = $user;
+                    $this->marksController->getTestMarks();
+                } else {
+                    $this->sendMethodNotAllowed();
+                }
+                break;
+
             default:
                 $this->sendNotFound();
                 break;
         }
+    }
+
+    /**
+     * Send welcome message for root endpoint
+     */
+    private function sendWelcome()
+    {
+        http_response_code(200);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'message' => 'NBA Assessment API v1.0',
+            'version' => '1.0.0',
+            'documentation' => '/nba/docs/APIDocumentation.md',
+            'endpoints' => [
+                'auth' => [
+                    'POST /auth/login',
+                    'GET /auth/profile',
+                    'PUT /auth/profile',
+                    'POST /auth/logout'
+                ],
+                'courses' => [
+                    'GET /courses'
+                ],
+                'assessment' => [
+                    'POST /assessment',
+                    'GET /assessment',
+                    'GET /course-tests'
+                ],
+                'marks' => [
+                    'POST /marks/by-question',
+                    'POST /marks/by-co',
+                    'GET /marks',
+                    'GET /marks/test'
+                ]
+            ]
+        ]);
     }
 
     /**
