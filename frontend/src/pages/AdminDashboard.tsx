@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { apiService } from "@/services/api";
 import {
 	Card,
 	CardContent,
@@ -169,8 +170,8 @@ export function AdminDashboard() {
 	const [sidebarOpen, setSidebarOpen] = useState(true);
 	const navigate = useNavigate();
 
-	const handleLogout = () => {
-		// Clear any auth tokens/session data here
+	const handleLogout = async () => {
+		await apiService.logout();
 		navigate("/login");
 	};
 

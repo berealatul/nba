@@ -7,28 +7,57 @@ import { Button } from "@/components/ui/button";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { DotPattern } from "@/components/ui/dot-pattern";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
-import { Apple, Github, Check } from "lucide-react";
+import { Apple, Github, Check, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiService } from "@/services/api";
 
 export function LoginPage() {
 	const [identifier, setIdentifier] = useState("");
 	const [password, setPassword] = useState("");
+	const [error, setError] = useState("");
+	const [loading, setLoading] = useState(false);
 	const navigate = useNavigate();
 
-	const handleSubmit = (e: React.FormEvent) => {
+	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		// Handle login logic here
-		console.log("Login attempt with:", { identifier, password });
-		// Navigate to dashboard
-		navigate("/dashboard");
+		setError("");
+		setLoading(true);
+
+		try {
+			const response = await apiService.login({
+				employeeIdOrEmail: identifier,
+				password: password,
+			});
+
+			if (response.success) {
+				const { user } = response.data;
+
+				// Route based on role
+				if (user.role === "faculty") {
+					navigate("/assessments");
+				} else {
+					navigate("/dashboard");
+				}
+			}
+		} catch (err) {
+			setError(
+				err instanceof Error
+					? err.message
+					: "Login failed. Please try again."
+			);
+		} finally {
+			setLoading(false);
+		}
 	};
 
 	const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setIdentifier(e.target.value);
+		if (error) setError("");
 	};
 
 	const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setPassword(e.target.value);
+		if (error) setError("");
 	};
 
 	return (
@@ -67,6 +96,18 @@ export function LoginPage() {
 										account
 									</p>
 								</div>
+
+								{/* Error Message */}
+								{error && (
+									<div className="rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 p-4">
+										<div className="flex items-center gap-2">
+											<AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+											<p className="text-sm text-red-600 dark:text-red-400">
+												{error}
+											</p>
+										</div>
+									</div>
+								)}
 
 								{/* Form */}
 								<form
@@ -125,9 +166,12 @@ export function LoginPage() {
 									<ShimmerButton
 										className="w-full"
 										type="submit"
+										disabled={loading}
 									>
 										<span className="whitespace-pre-wrap text-center text-sm font-medium leading-none tracking-tight text-white">
-											Sign In
+											{loading
+												? "Signing in..."
+												: "Sign In"}
 										</span>
 									</ShimmerButton>
 
