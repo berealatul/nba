@@ -1,9 +1,7 @@
 -- =============================================
 -- NBA PROJECT: FULL DATABASE (ENGINEERING ONLY)
 -- Database: nba_db
--- Scope: School of Engineering (TU) + Staff
--- Passwords: admin123 / password123
--- Compatible: XAMPP / phpMyAdmin
+-- Scope: School of Engineering
 -- =============================================
 -- Drop and recreate database
 DROP DATABASE IF EXISTS `nba_db`;
@@ -26,7 +24,6 @@ CREATE TABLE `departments` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 -- =============================================
 -- TABLE: users
--- email <= 64 chars → avoids index error
 -- =============================================
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
@@ -63,9 +60,6 @@ VALUES ('Computer Science & Engineering', 'CSE'),
 -- 3. Faculty (password123)
 -- 4. Staff (password123)
 -- =============================================
--- Password Hashes (CORRECTED)
--- admin123 → $2y$10$tnWpFNPhCWgg5y7.HTB7LeiMchFNnxp783V3dD8ZVOzsd5didUlqG
--- password123 → $2y$10$nlejuSHfBoAun490JDUHCuB4ZudU/4YR7eSh0OGuCV50poRy1NGUe
 -- ADMIN
 INSERT INTO `users` (
         `employee_id`,
@@ -305,21 +299,3 @@ VALUES (
         'staff',
         NULL
     );
--- =============================================
--- SUCCESS & LOGIN GUIDE
--- =============================================
-SELECT 'ENGINEERING DATA LOADED!' AS status;
-SELECT 'Login with email + password' AS guide;
-SELECT u.employee_id,
-    u.username,
-    u.email,
-    CASE
-        WHEN u.role = 'admin' THEN 'admin123'
-        ELSE 'password123'
-    END AS password,
-    u.role,
-    COALESCE(d.department_name, 'Administration') AS department
-FROM users u
-    LEFT JOIN departments d ON u.department_id = d.department_id
-ORDER BY u.role DESC,
-    u.employee_id;
