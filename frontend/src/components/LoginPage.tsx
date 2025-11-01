@@ -8,7 +8,11 @@ import { DotPattern } from "@/components/ui/dot-pattern";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { cn } from "@/lib/utils";
 
-export function LoginPage() {
+interface LoginPageProps {
+	onLogin: () => void;
+}
+
+export function LoginPage({ onLogin }: LoginPageProps) {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 
@@ -16,6 +20,8 @@ export function LoginPage() {
 		e.preventDefault();
 		// Handle login logic here
 		console.log("Login attempt with:", { email, password });
+		// Call onLogin to navigate to dashboard
+		onLogin();
 	};
 
 	return (
