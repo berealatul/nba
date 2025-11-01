@@ -11,16 +11,24 @@ import { Apple, Github, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function LoginPage() {
-	const [email, setEmail] = useState("");
+	const [identifier, setIdentifier] = useState("");
 	const [password, setPassword] = useState("");
 	const navigate = useNavigate();
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
 		// Handle login logic here
-		console.log("Login attempt with:", { email, password });
+		console.log("Login attempt with:", { identifier, password });
 		// Navigate to dashboard
 		navigate("/dashboard");
+	};
+
+	const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		setIdentifier(e.target.value);
+	};
+
+	const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		setPassword(e.target.value);
 	};
 
 	return (
@@ -65,23 +73,22 @@ export function LoginPage() {
 									onSubmit={handleSubmit}
 									className="space-y-6"
 								>
-									{/* Email Field */}
+									{/* Email or Employee ID Field */}
 									<div className="space-y-2">
 										<Label
-											htmlFor="email"
+											htmlFor="identifier"
 											className="text-slate-700 dark:text-slate-200"
 										>
-											Email Address
+											Email or Employee ID
 										</Label>
 										<Input
-											id="email"
-											type="email"
-											placeholder="you@example.com"
-											value={email}
-											onChange={(e) =>
-												setEmail(e.target.value)
-											}
+											id="identifier"
+											type="text"
+											placeholder="you@example.com or EMP12345"
+											value={identifier}
+											onChange={handleIdentifierChange}
 											required
+											autoComplete="username"
 											className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:placeholder:text-slate-500"
 										/>
 									</div>
@@ -107,10 +114,9 @@ export function LoginPage() {
 											type="password"
 											placeholder="••••••••"
 											value={password}
-											onChange={(e) =>
-												setPassword(e.target.value)
-											}
+											onChange={handlePasswordChange}
 											required
+											autoComplete="current-password"
 											className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:placeholder:text-slate-500"
 										/>
 									</div>
