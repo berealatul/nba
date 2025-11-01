@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { DotPattern } from "@/components/ui/dot-pattern";
+import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { cn } from "@/lib/utils";
 
 export function LoginPage() {
@@ -18,11 +19,16 @@ export function LoginPage() {
 	};
 
 	return (
-		<div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-linear-to-br from-slate-950 via-slate-900 to-slate-800">
+		<div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-linear-to-br from-slate-50 via-slate-100 to-slate-200 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+			{/* Theme Toggle Button */}
+			<div className="absolute top-6 right-6 z-50">
+				<AnimatedThemeToggler className="flex h-10 w-10 items-center justify-center rounded-full bg-white/80 dark:bg-slate-700/80 backdrop-blur-sm text-slate-900 dark:text-white hover:bg-white dark:hover:bg-slate-600 transition-colors border border-slate-300 dark:border-slate-700/50 shadow-lg" />
+			</div>
+
 			{/* Animated Dot Pattern Background */}
 			<DotPattern
 				className={cn(
-					"mask-[radial-gradient(600px_circle_at_center,white,transparent)]"
+					"mask-[radial-gradient(600px_circle_at_center,white,transparent)] text-slate-400/50 dark:text-neutral-400/80"
 				)}
 				width={20}
 				height={20}
@@ -33,17 +39,17 @@ export function LoginPage() {
 
 			{/* Main Content Container */}
 			<div className="relative z-10 w-full max-w-6xl px-4">
-				<Card className="overflow-hidden border-slate-700/50 bg-slate-900/90 backdrop-blur-xl shadow-2xl">
+				<Card className="overflow-hidden border-slate-200 bg-white backdrop-blur-xl shadow-2xl dark:border-slate-700/50 dark:bg-slate-900/90">
 					<CardContent className="grid p-0 md:grid-cols-2">
 						{/* Login Form Section */}
 						<div className="flex flex-col justify-center p-8 md:p-12">
 							<div className="mx-auto w-full max-w-md space-y-8">
 								{/* Header */}
 								<div className="space-y-2 text-center">
-									<h1 className="text-4xl font-bold tracking-tight text-white">
+									<h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
 										Welcome Back
 									</h1>
-									<p className="text-slate-400">
+									<p className="text-slate-600 dark:text-slate-400">
 										Enter your credentials to access your
 										account
 									</p>
@@ -58,7 +64,7 @@ export function LoginPage() {
 									<div className="space-y-2">
 										<Label
 											htmlFor="email"
-											className="text-slate-200"
+											className="text-slate-700 dark:text-slate-200"
 										>
 											Email Address
 										</Label>
@@ -71,7 +77,7 @@ export function LoginPage() {
 												setEmail(e.target.value)
 											}
 											required
-											className="border-slate-700 bg-slate-800/50 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500"
+											className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:placeholder:text-slate-500"
 										/>
 									</div>
 
@@ -80,13 +86,13 @@ export function LoginPage() {
 										<div className="flex items-center justify-between">
 											<Label
 												htmlFor="password"
-												className="text-slate-200"
+												className="text-slate-700 dark:text-slate-200"
 											>
 												Password
 											</Label>
 											<a
 												href="#"
-												className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+												className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
 											>
 												Forgot password?
 											</a>
@@ -100,7 +106,7 @@ export function LoginPage() {
 												setPassword(e.target.value)
 											}
 											required
-											className="border-slate-700 bg-slate-800/50 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500"
+											className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:placeholder:text-slate-500"
 										/>
 									</div>
 
@@ -117,10 +123,10 @@ export function LoginPage() {
 									{/* Divider */}
 									<div className="relative">
 										<div className="absolute inset-0 flex items-center">
-											<div className="w-full border-t border-slate-700"></div>
+											<div className="w-full border-t border-slate-300 dark:border-slate-700"></div>
 										</div>
 										<div className="relative flex justify-center text-xs uppercase">
-											<span className="bg-slate-900 px-2 text-slate-400">
+											<span className="bg-white dark:bg-slate-900 px-2 text-slate-500 dark:text-slate-400">
 												Or continue with
 											</span>
 										</div>
@@ -131,7 +137,7 @@ export function LoginPage() {
 										<Button
 											type="button"
 											variant="outline"
-											className="border-slate-700 bg-slate-800/50 hover:bg-slate-800 text-white"
+											className="border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-800 dark:text-white"
 										>
 											<svg
 												className="h-5 w-5"
@@ -147,7 +153,7 @@ export function LoginPage() {
 										<Button
 											type="button"
 											variant="outline"
-											className="border-slate-700 bg-slate-800/50 hover:bg-slate-800 text-white"
+											className="border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-800 dark:text-white"
 										>
 											<svg
 												className="h-5 w-5"
@@ -163,7 +169,7 @@ export function LoginPage() {
 										<Button
 											type="button"
 											variant="outline"
-											className="border-slate-700 bg-slate-800/50 hover:bg-slate-800 text-white"
+											className="border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-800 dark:text-white"
 										>
 											<svg
 												className="h-5 w-5"
@@ -180,11 +186,11 @@ export function LoginPage() {
 								</form>
 
 								{/* Sign Up Link */}
-								<div className="text-center text-sm text-slate-400">
+								<div className="text-center text-sm text-slate-600 dark:text-slate-400">
 									Don't have an account?{" "}
 									<a
 										href="#"
-										className="text-blue-400 hover:text-blue-300 font-medium transition-colors"
+										className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
 									>
 										Sign up
 									</a>
@@ -273,13 +279,19 @@ export function LoginPage() {
 				</Card>
 
 				{/* Terms and Privacy */}
-				<p className="mt-6 text-center text-xs text-slate-500">
+				<p className="mt-6 text-center text-xs text-slate-600 dark:text-slate-500">
 					By continuing, you agree to our{" "}
-					<a href="#" className="text-slate-400 hover:text-slate-300">
+					<a
+						href="#"
+						className="text-slate-700 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300"
+					>
 						Terms of Service
 					</a>{" "}
 					and{" "}
-					<a href="#" className="text-slate-400 hover:text-slate-300">
+					<a
+						href="#"
+						className="text-slate-700 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300"
+					>
 						Privacy Policy
 					</a>
 					.
