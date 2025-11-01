@@ -1,0 +1,13 @@
+# Enable URL rewriting
+RewriteEngine On
+
+# Handle API routes
+RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
+# Handle root API requests
+RewriteRule ^api$ api/index.php [QSA,L]
+
+# Security: Deny access to sensitive files
+<FilesMatch "^(setup_database|test_setup)\.php$">
+    Require all denied
+</FilesMatch>

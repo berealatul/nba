@@ -1,0 +1,243 @@
+<?php
+
+/**
+ * User Controller
+ * Follows Single Responsibility Principle - handles only user-related HTTP requests
+ * Follows Dependency Inversion Principle - depends on abstractions
+ */
+class UserController
+{
+    private $authService;
+    private $userRepository;
+    private $departmentRepository;
+    private $validationMiddleware;
+
+    public function __construct(AuthService $authService, UserRepository $userRepository, DepartmentRepository $departmentRepository, ValidationMiddleware $validationMiddleware)
+    {
+        $this->authService = $authService;
+        $this->userRepository = $userRepository;
+        $this->departmentRepository = $departmentRepository;
+        $this->validationMiddleware = $validationMiddleware;
+    }
+
+    /**
+     * Handle user login
+     */
+    public function login()
+    {
+        try {
+            $data = $this->validationMiddleware->getJsonInput();
+
+            if (!$data) {
+                throw new Exception("Invalid JSON input");
+            }
+
+            // Validate input
+            $errors = $this->validationMiddleware->validateLoginData($data);
+            if (!empty($errors)) {
+                $this->validationMiddleware->sendValidationErrorResponse($errors);
+                return;
+            }
+
+            // Attempt authentication
+            $result = $this->authService->authenticate($data['employeeIdOrEmail'], $data['password']);
+
+            if (!$result) {
+                http_response_code(401);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Invalid credentials'
+                ]);
+                return;
+            }
+
+            // Success response
+            http_response_code(200);
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'message' => 'Login successful',
+                'data' => $result
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Login failed',
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Handle user profile retrieval
+     */
+    public function getProfile()
+    {
+        try {
+            // Authentication is handled by middleware, user data is passed
+            $userData = $_REQUEST['authenticated_user'];
+
+            http_response_code(200);
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'message' => 'Profile retrieved successfully',
+                'data' => $userData
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to retrieve profile',
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Handle user profile update
+     */
+    public function updateProfile()
+    {
+        try {
+            $userData = $_REQUEST['authenticated_user'];
+            $data = $this->validationMiddleware->getJsonInput();
+
+            if (!$data) {
+                throw new Exception("Invalid JSON input");
+            }
+
+            // Validate input
+            $errors = $this->validationMiddleware->validateProfileUpdateData($data);
+            if (!empty($errors)) {
+                $this->validationMiddleware->sendValidationErrorResponse($errors);
+                return;
+            }
+
+            // Get current user
+            $user = $this->userRepository->findByEmployeeId($userData['employee_id']);
+            if (!$user) {
+                http_response_code(404);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'User not found'
+                ]);
+                return;
+            }
+
+            // Update user data
+            if (isset($data['username'])) {
+                // Check if username is already taken
+                if ($this->userRepository->usernameExists($data['username'], $user->getEmployeeId())) {
+                    http_response_code(409);
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'Username already exists'
+                    ]);
+                    return;
+                }
+                $user->setUsername($data['username']);
+            }
+
+            if (isset($data['email'])) {
+                // Check if email is already taken
+                if ($this->userRepository->emailExists($data['email'], $user->getEmployeeId())) {
+                    http_response_code(409);
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'Email already exists'
+                    ]);
+                    return;
+                }
+                $user->setEmail($data['email']);
+            }
+
+            if (isset($data['password'])) {
+                $user->setPassword(password_hash($data['password'], PASSWORD_DEFAULT));
+            }
+
+            if (isset($data['role'])) {
+                $user->setRole($data['role']);
+            }
+
+            // Save updated user
+            if ($this->userRepository->save($user)) {
+                http_response_code(200);
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Profile updated successfully',
+                    'data' => $user->toArray()
+                ]);
+            } else {
+                throw new Exception("Failed to update profile");
+            }
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to update profile',
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Handle user logout
+     */
+    public function logout()
+    {
+        try {
+            $userData = $_REQUEST['authenticated_user'];
+
+            // In a stateless JWT system, logout is mainly client-side
+            // Server-side could implement token blacklisting if needed
+            $result = $this->authService->logout($_REQUEST['token']);
+
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Logout successful'
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Logout failed',
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Get department information by employee ID
+     */
+    public function getDepartmentByEmployeeId()
+    {
+        try {
+            // Authentication is handled by middleware, user data is passed
+            $userData = $_REQUEST['authenticated_user'];
+
+            // Get user's department
+            $department = null;
+            if ($userData['department_id']) {
+                $department = $this->departmentRepository->findById($userData['department_id']);
+            }
+
+            http_response_code(200);
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'message' => 'Department information retrieved successfully',
+                'data' => $department ? $department->toArray() : null
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to retrieve department information',
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+}
