@@ -31,6 +31,71 @@ export interface ApiError {
 	errors?: string[];
 }
 
+export interface Course {
+	id: number;
+	course_code: string;
+	name: string;
+	credit: number;
+	syllabus: string | null;
+	faculty_id: number;
+	year: number;
+	semester: number;
+}
+
+export interface Question {
+	question_number: number;
+	sub_question?: string;
+	is_optional?: boolean;
+	co: number;
+	max_marks: number;
+	description?: string;
+}
+
+export interface QuestionResponse extends Question {
+	id: number;
+	test_id: number;
+	question_identifier: string;
+}
+
+export interface Test {
+	id: number;
+	course_id: number;
+	name: string;
+	full_marks: number;
+	pass_marks: number;
+	question_link: string | null;
+}
+
+export interface CreateAssessmentRequest {
+	course_id: number;
+	name: string;
+	full_marks: number;
+	pass_marks: number;
+	question_link?: string;
+	questions: Question[];
+}
+
+export interface CreateAssessmentResponse {
+	success: boolean;
+	message: string;
+	data: {
+		test: Test;
+		questions: QuestionResponse[];
+	};
+}
+
+export interface CoursesResponse {
+	success: boolean;
+	message: string;
+	data: Course[];
+}
+
+export interface CourseTestsResponse {
+	success: boolean;
+	message: string;
+	data: Test[];
+}
+
 class ApiService {
 	private token: string | null = null;
 
@@ -115,6 +180,91 @@ class ApiService {
 			return JSON.parse(userStr);
 		}
 		return null;
+	}
+
+	// Assessment APIs
+	async getCourses(): Promise<Course[]> {
+		const response = await fetch(`${API_BASE_URL}/courses`, {
+			headers: {
+				Authorization: `Bearer ${this.token}`,
+			},
+		});
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			throw new Error(data.message || "Failed to fetch courses");
+		}
+
+		return data.data;
+	}
+
+	async getCourseTests(courseId: number): Promise<Test[]> {
+		const response = await fetch(
+			`${API_BASE_URL}/course-tests?course_id=${courseId}`,
+			{
+				headers: {
+					Authorization: `Bearer ${this.token}`,
+				},
+			}
+		);
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			throw new Error(data.message || "Failed to fetch tests");
+		}
+
+		// Ensure we always return an array
+		return Array.isArray(data.data) ? data.data : [];
+	}
+
+	async createAssessment(
+		assessment: CreateAssessmentRequest
+	): Promise<CreateAssessmentResponse> {
+		const response = await fetch(`${API_BASE_URL}/assessment`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${this.token}`,
+			},
+			body: JSON.stringify(assessment),
+		});
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			throw new Error(
+				data.errors
+					? data.errors.join(", ")
+					: data.message || "Failed to create assessment"
+			);
+		}
+
+		return data;
+	}
+
+	async getAssessment(testId: number): Promise<{
+		test: Test;
+		course: Course;
+		questions: QuestionResponse[];
+	}> {
+		const response = await fetch(
+			`${API_BASE_URL}/assessment?test_id=${testId}`,
+			{
+				headers: {
+					Authorization: `Bearer ${this.token}`,
+				},
+			}
+		);
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			throw new Error(data.message || "Failed to fetch assessment");
+		}
+
+		return data.data;
 	}
 }
 
