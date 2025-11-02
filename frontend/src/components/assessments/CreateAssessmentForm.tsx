@@ -16,7 +16,7 @@ import type { Course, Question } from "@/services/api";
 
 interface CreateAssessmentFormProps {
 	courses: Course[];
-	onSuccess: () => void;
+	onSuccess: (courseId?: number) => void;
 	onCancel: () => void;
 }
 
@@ -112,7 +112,7 @@ export function CreateAssessmentForm({
 			toast.success(
 				`Assessment created successfully! Test ID: ${result.data.test.id}`
 			);
-			onSuccess();
+			onSuccess(parseInt(courseId));
 		} catch (error) {
 			console.error("Failed to create assessment:", error);
 			if (error instanceof Error) {

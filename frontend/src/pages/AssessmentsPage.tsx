@@ -46,8 +46,15 @@ export function AssessmentsPage() {
 		navigate("/login");
 	};
 
-	const handleAssessmentCreated = () => {
+	const handleAssessmentCreated = (courseId?: number) => {
 		setShowCreateForm(false);
+		// If a courseId is provided, select that course
+		if (courseId) {
+			const course = courses.find((c) => c.id === courseId);
+			if (course) {
+				setSelectedCourse(course);
+			}
+		}
 		setRefreshTrigger((prev) => prev + 1);
 	};
 

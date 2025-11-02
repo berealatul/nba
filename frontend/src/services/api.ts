@@ -215,8 +215,14 @@ class ApiService {
 			throw new Error(data.message || "Failed to fetch tests");
 		}
 
-		// Ensure we always return an array
-		return Array.isArray(data.data) ? data.data : [];
+		// API returns { data: { course: {...}, tests: [...] } }
+		// We need to extract the tests array
+		if (data.data && Array.isArray(data.data.tests)) {
+			return data.data.tests;
+		}
+
+		// Fallback: ensure we always return an array
+		return [];
 	}
 
 	async createAssessment(
