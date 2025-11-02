@@ -16,6 +16,7 @@ interface AssessmentsHeaderProps {
 	selectedCourse: Course | null;
 	onCourseChange: (course: Course | null) => void;
 	onCreateNew: () => void;
+	isMarksPage?: boolean;
 }
 
 export function AssessmentsHeader({
@@ -25,6 +26,7 @@ export function AssessmentsHeader({
 	selectedCourse,
 	onCourseChange,
 	onCreateNew,
+	isMarksPage = false,
 }: AssessmentsHeaderProps) {
 	return (
 		<header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-6">
@@ -43,10 +45,14 @@ export function AssessmentsHeader({
 				</Button>
 				<div>
 					<h1 className="text-xl font-bold text-gray-900 dark:text-white">
-						Assessment Management
+						{isMarksPage
+							? "Marks Management"
+							: "Assessment Management"}
 					</h1>
 					<p className="text-sm text-gray-500 dark:text-gray-400">
-						Create and manage course assessments
+						{isMarksPage
+							? "Enter and manage student marks"
+							: "Create and manage course assessments"}
 					</p>
 				</div>
 			</div>
@@ -90,11 +96,13 @@ export function AssessmentsHeader({
 					</DropdownMenuContent>
 				</DropdownMenu>
 
-				{/* Create New Button */}
-				<Button onClick={onCreateNew} className="gap-2">
-					<Plus className="w-4 h-4" />
-					Create Assessment
-				</Button>
+				{/* Create New Button - Only show on assessments page */}
+				{!isMarksPage && (
+					<Button onClick={onCreateNew} className="gap-2">
+						<Plus className="w-4 h-4" />
+						Create Assessment
+					</Button>
+				)}
 
 				<AnimatedThemeToggler />
 			</div>

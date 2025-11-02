@@ -1,19 +1,23 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ClipboardList, LogOut } from "lucide-react";
+import { ClipboardList, LogOut, FileCheck } from "lucide-react";
 import type { User } from "@/services/api";
 
 interface AssessmentsSidebarProps {
 	user: User;
 	sidebarOpen: boolean;
 	onLogout: () => void;
+	currentPage?: "assessments" | "marks";
+	onNavigate?: (page: "assessments" | "marks") => void;
 }
 
 export function AssessmentsSidebar({
 	user,
 	sidebarOpen,
 	onLogout,
+	currentPage = "assessments",
+	onNavigate,
 }: AssessmentsSidebarProps) {
 	return (
 		<aside
@@ -42,9 +46,27 @@ export function AssessmentsSidebar({
 				{/* Navigation */}
 				<ScrollArea className="flex-1 px-3 py-4">
 					<nav className="space-y-1">
-						<button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 transition-all">
+						<button
+							onClick={() => onNavigate?.("assessments")}
+							className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+								currentPage === "assessments"
+									? "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
+									: "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+							}`}
+						>
 							<ClipboardList className="w-5 h-5" />
 							<span>Assessments</span>
+						</button>
+						<button
+							onClick={() => onNavigate?.("marks")}
+							className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+								currentPage === "marks"
+									? "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
+									: "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+							}`}
+						>
+							<FileCheck className="w-5 h-5" />
+							<span>Marks Entry</span>
 						</button>
 					</nav>
 

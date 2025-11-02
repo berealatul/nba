@@ -96,6 +96,66 @@ export interface CourseTestsResponse {
 	data: Test[];
 }
 
+export interface QuestionMarks {
+	question_identifier: string;
+	marks: number;
+}
+
+export interface SaveMarksByQuestionRequest {
+	test_id: number;
+	student_id: string;
+	marks: QuestionMarks[];
+}
+
+export interface SaveMarksByCORequest {
+	test_id: number;
+	student_id: string;
+	CO1?: number;
+	CO2?: number;
+	CO3?: number;
+	CO4?: number;
+	CO5?: number;
+	CO6?: number;
+}
+
+export interface COTotals {
+	CO1: number;
+	CO2: number;
+	CO3: number;
+	CO4: number;
+	CO5: number;
+	CO6: number;
+}
+
+export interface MarksRecord {
+	id: number;
+	student_id: string;
+	test_id: number;
+	CO1: number;
+	CO2: number;
+	CO3: number;
+	CO4: number;
+	CO5: number;
+	CO6: number;
+}
+
+export interface RawMarksRecord {
+	question_identifier: string;
+	marks: number;
+	co: number;
+}
+
+export interface StudentMarks {
+	marks: MarksRecord | null;
+	raw_marks: RawMarksRecord[];
+}
+
+export interface Student {
+	rollno: string;
+	name: string;
+	dept: number;
+}
+
 class ApiService {
 	private token: string | null = null;
 
@@ -268,6 +328,92 @@ class ApiService {
 
 		if (!response.ok) {
 			throw new Error(data.message || "Failed to fetch assessment");
+		}
+
+		return data.data;
+	}
+
+	// Marks Management APIs
+
+	async saveMarksByQuestion(
+		marksData: SaveMarksByQuestionRequest
+	): Promise<{ student_id: string; test_id: number; co_totals: COTotals }> {
+		const response = await fetch(`${API_BASE_URL}/marks/by-question`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${this.token}`,
+			},
+			body: JSON.stringify(marksData),
+		});
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			throw new Error(data.message || "Failed to save marks");
+		}
+
+		return data.data;
+	}
+
+	async saveMarksByCO(marksData: SaveMarksByCORequest): Promise<MarksRecord> {
+		const response = await fetch(`${API_BASE_URL}/marks/by-co`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${this.token}`,
+			},
+			body: JSON.stringify(marksData),
+		});
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			throw new Error(data.message || "Failed to save marks");
+		}
+
+		return data.data;
+	}
+
+	async getStudentMarks(
+		testId: number,
+		studentId: string
+	): Promise<StudentMarks> {
+		const response = await fetch(
+			`${API_BASE_URL}/marks?test_id=${testId}&student_id=${studentId}`,
+			{
+				headers: {
+					Authorization: `Bearer ${this.token}`,
+				},
+			}
+		);
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			throw new Error(data.message || "Failed to fetch marks");
+		}
+
+		return data.data;
+	}
+
+	async getTestMarks(testId: number): Promise<{
+		test: Test;
+		marks: Array<MarksRecord & { student_name: string }>;
+	}> {
+		const response = await fetch(
+			`${API_BASE_URL}/marks/test?test_id=${testId}`,
+			{
+				headers: {
+					Authorization: `Bearer ${this.token}`,
+				},
+			}
+		);
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			throw new Error(data.message || "Failed to fetch test marks");
 		}
 
 		return data.data;

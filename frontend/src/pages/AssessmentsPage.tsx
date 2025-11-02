@@ -46,6 +46,12 @@ export function AssessmentsPage() {
 		navigate("/login");
 	};
 
+	const handleNavigate = (page: "assessments" | "marks") => {
+		if (page === "marks") {
+			navigate("/marks");
+		}
+	};
+
 	const handleAssessmentCreated = (courseId?: number) => {
 		setShowCreateForm(false);
 		// If a courseId is provided, select that course
@@ -71,6 +77,8 @@ export function AssessmentsPage() {
 					user={user}
 					sidebarOpen={sidebarOpen}
 					onLogout={handleLogout}
+					currentPage="assessments"
+					onNavigate={handleNavigate}
 				/>
 
 				{/* Main Content */}

@@ -3,6 +3,7 @@ import "./App.css";
 import { LoginPage } from "./pages/LoginPage";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { AssessmentsPage } from "./pages/AssessmentsPage";
+import { MarksPage } from "./pages/MarksPage";
 
 function App() {
 	return (
@@ -11,6 +12,7 @@ function App() {
 				<Route path="/login" element={<LoginPage />} />
 				<Route path="/dashboard" element={<AdminDashboard />} />
 				<Route path="/assessments" element={<AssessmentsPage />} />
+				<Route path="/marks" element={<MarksPage />} />
 				<Route path="/" element={<Navigate to="/login" replace />} />
 				<Route path="*" element={<Navigate to="/login" replace />} />
 			</Routes>
