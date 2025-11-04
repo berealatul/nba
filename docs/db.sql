@@ -343,7 +343,6 @@ INSERT INTO `course` (
         `name`,
         `credit`,
         `syllabus_pdf`,
-        `syllabus_filename`,
         `faculty_id`,
         `year`,
         `semester`
@@ -353,7 +352,6 @@ VALUES (
         'CS101',
         'Introduction to Programming',
         4,
-        NULL,
         NULL,
         3001,
         2024,
@@ -365,7 +363,6 @@ VALUES (
         'Data Structures and Algorithms',
         4,
         NULL,
-        NULL,
         3001,
         2024,
         1
@@ -375,7 +372,6 @@ VALUES (
         'CS301',
         'Database Management Systems',
         3,
-        NULL,
         NULL,
         3002,
         2024,
@@ -387,7 +383,6 @@ VALUES (
         'Computer Networks',
         3,
         NULL,
-        NULL,
         3004,
         2024,
         2
@@ -397,7 +392,6 @@ VALUES (
         'EC201',
         'Digital Electronics',
         4,
-        NULL,
         NULL,
         3005,
         2025,
@@ -409,7 +403,6 @@ VALUES (
         'Microprocessors',
         3,
         NULL,
-        NULL,
         3006,
         2025,
         1
@@ -420,7 +413,6 @@ VALUES (
         'Thermodynamics',
         4,
         NULL,
-        NULL,
         3007,
         2025,
         2
@@ -430,7 +422,6 @@ VALUES (
         'ME301',
         'Fluid Mechanics',
         3,
-        NULL,
         NULL,
         3008,
         2025,

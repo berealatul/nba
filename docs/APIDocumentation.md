@@ -273,10 +273,10 @@ Authorization: Bearer <jwt_token>
       "course_code": "CS101",
       "name": "Introduction to Programming",
       "credit": 4,
-      "syllabus_filename": "CS101_Syllabus.pdf",
+      "syllabus_filename": "CS101_2024_1.pdf",
       "has_syllabus_pdf": true,
       "faculty_id": 3001,
-      "year": 1,
+      "year": 2024,
       "semester": 1
     },
     {
@@ -287,8 +287,8 @@ Authorization: Bearer <jwt_token>
       "syllabus_filename": null,
       "has_syllabus_pdf": false,
       "faculty_id": 3001,
-      "year": 2,
-      "semester": 1
+      "year": 2024,
+      "semester": 2
     }
   ]
 }
@@ -402,7 +402,7 @@ Content-Type: application/json
       "name": "Mid Semester Examination",
       "full_marks": 50,
       "pass_marks": 20,
-      "question_paper_filename": "MidSem_CS101_2024.pdf",
+      "question_paper_filename": "CS101_2024_1_Mid_Semester_Examination.pdf",
       "has_question_paper_pdf": true
     },
     "questions": [
@@ -507,7 +507,7 @@ GET /assessment?test_id=1
       "name": "Mid Semester Examination",
       "full_marks": 50,
       "pass_marks": 20,
-      "question_paper_filename": "MidSem_CS101_2024.pdf",
+      "question_paper_filename": "CS101_2024_1_Mid_Semester_Examination.pdf",
       "has_question_paper_pdf": true
     },
     "course": {
@@ -515,10 +515,10 @@ GET /assessment?test_id=1
       "course_code": "CS101",
       "name": "Introduction to Programming",
       "credit": 4,
-      "syllabus_filename": "CS101_Syllabus.pdf",
+      "syllabus_filename": "CS101_2024_1.pdf",
       "has_syllabus_pdf": true,
       "faculty_id": 3001,
-      "year": 1,
+      "year": 2024,
       "semester": 1
     },
     "questions": [
@@ -608,7 +608,7 @@ GET /course-tests?course_id=1
       "name": "Mid Semester Examination",
       "full_marks": 50,
       "pass_marks": 20,
-      "question_paper_filename": "MidSem_CS101_2024.pdf",
+      "question_paper_filename": "CS101_2024_1_Mid_Semester_Examination.pdf",
       "has_question_paper_pdf": true
     },
     {
@@ -617,7 +617,7 @@ GET /course-tests?course_id=1
       "name": "End Semester Examination",
       "full_marks": 100,
       "pass_marks": 40,
-      "question_paper_filename": "EndSem_CS101_2024.pdf",
+      "question_paper_filename": "CS101_2024_1_End_Semester_Examination.pdf",
       "has_question_paper_pdf": true
     }
   ]
@@ -868,7 +868,7 @@ GET /marks/test?test_id=1
       "name": "Mid Semester Examination",
       "full_marks": 50,
       "pass_marks": 20,
-      "question_paper_filename": "MidSem_CS101_2024.pdf",
+      "question_paper_filename": "CS101_2024_1_Mid_Semester_Examination.pdf",
       "has_question_paper_pdf": true
     },
     "marks": [
