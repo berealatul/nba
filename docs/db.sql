@@ -92,6 +92,19 @@ CREATE TABLE `student` (
     INDEX (`dept`),
     FOREIGN KEY (`dept`) REFERENCES `departments`(`department_id`) ON DELETE RESTRICT
 );
+-- Course Enrollment (tracks which students are enrolled in which courses)
+CREATE TABLE `enrollment` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `course_id` BIGINT NOT NULL,
+    `student_rollno` VARCHAR(20) NOT NULL,
+    `enrolled_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY (`course_id`, `student_rollno`),
+    INDEX (`course_id`),
+    INDEX (`student_rollno`),
+    FOREIGN KEY (`course_id`) REFERENCES `course`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`student_rollno`) REFERENCES `student`(`rollno`) ON DELETE CASCADE
+);
 -- Raw Marks (per-question scores, dropped every semester)
 CREATE TABLE `rawMarks` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,

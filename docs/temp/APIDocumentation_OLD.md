@@ -840,9 +840,9 @@ GET /marks?test_id=1&student_id=CS101
 
 **Endpoint:** `GET /marks/test`
 
-**Description:** Get CO-aggregated marks for all students who have taken a specific test.
+**Description:** Get marks for all students who have taken a specific test. Returns CO-aggregated marks by default. Add `include_raw=true` to also get per-question raw marks.
 
-**Authentication:** Required (Faculty only)
+**Authentication:** Required (Faculty only - must be the course faculty)
 
 **Headers:**
 ```
@@ -851,13 +851,15 @@ Authorization: Bearer <jwt_token>
 
 **Query Parameters:**
 - `test_id` (required): Test ID
+- `include_raw` (optional): Set to `true` to include raw marks (per-question scores). Default: `false`
 
-**Example Request:**
+**Example Requests:**
 ```
 GET /marks/test?test_id=1
+GET /marks/test?test_id=1&include_raw=true
 ```
 
-**Success Response (200):**
+**Success Response - Without raw marks (200):**
 ```json
 {
   "success": true,
@@ -871,36 +873,177 @@ GET /marks/test?test_id=1
       "question_paper_filename": "CS101_2024_1_Mid_Semester_Examination.pdf",
       "has_question_paper_pdf": true
     },
+    "course": {
+      "id": 1,
+      "course_code": "CS101",
+      "name": "Introduction to Programming"
+    },
     "marks": [
       {
         "student_id": "CS101",
         "student_name": "Rajesh Kumar",
-        "CO1": 5,
+        "CO1": 5.0,
         "CO2": 5.5,
-        "CO3": 8,
-        "CO4": 0,
-        "CO5": 0,
-        "CO6": 0
+        "CO3": 8.0,
+        "CO4": 0.0,
+        "CO5": 0.0,
+        "CO6": 0.0
       },
       {
         "student_id": "CS102",
         "student_name": "Priya Sharma",
-        "CO1": 4,
-        "CO2": 6,
-        "CO3": 9,
-        "CO4": 0,
-        "CO5": 0,
-        "CO6": 0
+        "CO1": 4.0,
+        "CO2": 6.0,
+        "CO3": 9.0,
+        "CO4": 0.0,
+        "CO5": 0.0,
+        "CO6": 0.0
       }
     ]
   }
 }
 ```
 
-**Note:**
+**Success Response - With raw marks (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "test": {
+      "id": 1,
+      "course_id": 1,
+      "name": "Mid Semester Examination",
+      "full_marks": 50,
+      "pass_marks": 20,
+      "question_paper_filename": "CS101_2024_1_Mid_Semester_Examination.pdf",
+      "has_question_paper_pdf": true
+    },
+    "course": {
+      "id": 1,
+      "course_code": "CS101",
+      "name": "Introduction to Programming"
+    },
+    "marks": [
+      {
+        "student_id": "CS101",
+        "student_name": "Rajesh Kumar",
+        "CO1": 5.0,
+        "CO2": 5.5,
+        "CO3": 8.0,
+        "CO4": 0.0,
+        "CO5": 0.0,
+        "CO6": 0.0
+      }
+    ],
+    "raw_marks": [
+      {
+        "student_id": "CS101",
+        "student_name": "Rajesh Kumar",
+        "raw_marks": [
+          {
+            "question_id": 1,
+            "question_number": 1,
+            "sub_question": null,
+            "question_identifier": "1",
+            "marks_obtained": 5.0,
+            "max_marks": 5.0,
+            "co": 1
+          },
+          {
+            "question_id": 2,
+            "question_number": 2,
+            "sub_question": "a",
+            "question_identifier": "2a",
+            "marks_obtained": 3.5,
+            "max_marks": 4.0,
+            "co": 2
+          },
+          {
+            "question_id": 3,
+            "question_number": 2,
+            "sub_question": "b",
+            "question_identifier": "2b",
+            "marks_obtained": 2.0,
+            "max_marks": 3.0,
+            "co": 2
+          }
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": 1,
+        "question_number": 1,
+        "sub_question": null,
+        "question_identifier": "1",
+        "max_marks": 5.0,
+        "co": 1,
+        "is_optional": false
+      },
+      {
+        "id": 2,
+        "question_number": 2,
+        "sub_question": "a",
+        "question_identifier": "2a",
+        "max_marks": 4.0,
+        "co": 2,
+        "is_optional": false
+      },
+      {
+        "id": 3,
+        "question_number": 2,
+        "sub_question": "b",
+        "question_identifier": "2b",
+        "max_marks": 3.0,
+        "co": 2,
+        "is_optional": false
+      }
+    ]
+  }
+}
+```
+
+**Error Responses:**
+
+**400 - Bad Request:**
+```json
+{
+  "success": false,
+  "message": "Missing test_id parameter"
+}
+```
+
+**401 - Unauthorized:**
+```json
+{
+  "success": false,
+  "message": "Unauthorized"
+}
+```
+
+**403 - Forbidden:**
+```json
+{
+  "success": false,
+  "message": "You are not authorized to view marks for this test"
+}
+```
+
+**404 - Not Found:**
+```json
+{
+  "success": false,
+  "message": "Test not found"
+}
+```
+
+**Features:**
 - Returns only students who have marks saved
-- Useful for generating reports and analysis
-- Only shows CO-aggregated totals, not per-question breakdown
+- Faculty authorization: only course faculty can view marks
+- Optional raw marks for detailed per-question breakdown
+- Includes course information for context
+- Questions list when raw marks included
+- Useful for generating reports and detailed analysis
 
 ---
 
@@ -1142,3 +1285,474 @@ Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With
 - Input sanitization and validation
 - SQL injection prevention with prepared statements
 - XSS protection with input sanitization
+
+---
+
+## 13. Bulk Enroll Students
+
+**Endpoint:** `POST /courses/{courseId}/enroll`
+
+**Description:** Bulk enroll students into a course. Only the faculty assigned to the course can enroll students. If a student doesn't exist in the system, they will be automatically created.
+
+**Authentication:** Required (Faculty only for their courses)
+
+**URL Parameters:**
+- `courseId` (integer): The course ID
+
+**Request Body:**
+```json
+{
+  "students": [
+    {
+      "rollno": "CS101",
+      "name": "Rajesh Kumar"
+    },
+    {
+      "rollno": "CS102",
+      "name": "Priya Sharma"
+    },
+    {
+      "rollno": "CS103",
+      "name": "Amit Patel"
+    }
+  ]
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Enrollment completed: 3 successful, 0 failed",
+  "data": {
+    "successful": [
+      {
+        "rollno": "CS101",
+        "name": "Rajesh Kumar",
+        "enrollment_id": 1
+      },
+      {
+        "rollno": "CS102",
+        "name": "Priya Sharma",
+        "enrollment_id": 2
+      },
+      {
+        "rollno": "CS103",
+        "name": "Amit Patel",
+        "enrollment_id": 3
+      }
+    ],
+    "failed": [],
+    "total": 3,
+    "success_count": 3,
+    "failure_count": 0
+  }
+}
+```
+
+**Partial Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Enrollment completed: 2 successful, 1 failed",
+  "data": {
+    "successful": [
+      {
+        "rollno": "CS101",
+        "name": "Rajesh Kumar",
+        "enrollment_id": 1
+      },
+      {
+        "rollno": "CS102",
+        "name": "Priya Sharma",
+        "enrollment_id": 2
+      }
+    ],
+    "failed": [
+      {
+        "rollno": "CS103",
+        "name": "Amit Patel",
+        "reason": "Already enrolled in this course"
+      }
+    ],
+    "total": 3,
+    "success_count": 2,
+    "failure_count": 1
+  }
+}
+```
+
+**Error Responses:**
+
+**400 - Bad Request (Empty students array):**
+```json
+{
+  "success": false,
+  "message": "students array cannot be empty"
+}
+```
+
+**400 - Bad Request (Missing fields):**
+```json
+{
+  "success": false,
+  "message": "Student at index 0 missing rollno or name"
+}
+```
+
+**403 - Forbidden:**
+```json
+{
+  "success": false,
+  "message": "You are not authorized to enroll students in this course"
+}
+```
+
+**404 - Not Found:**
+```json
+{
+  "success": false,
+  "message": "Course not found"
+}
+```
+
+---
+
+## 14. Get Course Enrollments
+
+**Endpoint:** `GET /courses/{courseId}/enrollments`
+
+**Description:** Get list of all students enrolled in a specific course. Only the faculty assigned to the course can view enrollments. Optionally include `test_id` query parameter to get test information and questions for marks entry.
+
+**Authentication:** Required (Faculty only for their courses)
+
+**URL Parameters:**
+- `courseId` (integer): The course ID
+
+**Query Parameters (Optional):**
+- `test_id` (integer): Test ID to include test information and questions
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Found 3 enrolled students",
+  "data": {
+    "course_id": 1,
+    "course_code": "CS101",
+    "course_name": "Introduction to Programming",
+    "enrollment_count": 3,
+    "enrollments": [
+      {
+        "id": 1,
+        "course_id": 1,
+        "student_rollno": "CS101",
+        "student_name": "Rajesh Kumar",
+        "enrolled_at": "2025-11-04 10:30:00"
+      },
+      {
+        "id": 2,
+        "course_id": 1,
+        "student_rollno": "CS102",
+        "student_name": "Priya Sharma",
+        "enrolled_at": "2025-11-04 10:30:05"
+      },
+      {
+        "id": 3,
+        "course_id": 1,
+        "student_rollno": "CS103",
+        "student_name": "Amit Patel",
+        "enrolled_at": "2025-11-04 10:30:10"
+      }
+    ],
+    "test_info": {
+      "test_id": 1,
+      "test_name": "Mid Semester",
+      "full_marks": 50,
+      "questions": [
+        {
+          "id": 1,
+          "question_number": 1,
+          "sub_question": null,
+          "question_identifier": "1",
+          "max_marks": 5.0,
+          "co": 1,
+          "is_optional": false
+        },
+        {
+          "id": 2,
+          "question_number": 2,
+          "sub_question": "a",
+          "question_identifier": "2a",
+          "max_marks": 3.0,
+          "co": 2,
+          "is_optional": false
+        }
+      ]
+    }
+  }
+}
+```
+
+**Note:** The `test_info` field is only included when `test_id` query parameter is provided.
+
+**Error Responses:**
+
+**403 - Forbidden:**
+```json
+{
+  "success": false,
+  "message": "You are not authorized to view enrollments for this course"
+}
+```
+
+**404 - Not Found:**
+```json
+{
+  "success": false,
+  "message": "Course not found"
+}
+```
+
+---
+
+## 15. Remove Student from Course
+
+**Endpoint:** `DELETE /courses/{courseId}/enroll/{rollno}`
+
+**Description:** Remove a student from a course. Only the faculty assigned to the course can remove enrollments.
+
+**Authentication:** Required (Faculty only for their courses)
+
+**URL Parameters:**
+- `courseId` (integer): The course ID
+- `rollno` (string): The student's roll number
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Student removed from course successfully"
+}
+```
+
+**Error Responses:**
+
+**403 - Forbidden:**
+```json
+{
+  "success": false,
+  "message": "You are not authorized to remove enrollments from this course"
+}
+```
+
+**404 - Not Found (Course):**
+```json
+{
+  "success": false,
+  "message": "Course not found"
+}
+```
+
+**404 - Not Found (Enrollment):**
+```json
+{
+  "success": false,
+  "message": "Student is not enrolled in this course"
+}
+```
+
+---
+
+## 16. Bulk Save Marks
+
+**Endpoint:** `POST /marks/bulk`
+
+**Description:** Save marks for multiple students and questions in a single request. Automatically aggregates CO marks after saving. This is the recommended method for bulk marks entry as it's more efficient than individual submissions.
+
+**Authentication:** Required (Faculty)
+
+**Request Body:**
+```json
+{
+  "test_id": 1,
+  "marks_entries": [
+    {
+      "student_rollno": "CS101",
+      "question_number": 1,
+      "sub_question": null,
+      "marks_obtained": 5.0
+    },
+    {
+      "student_rollno": "CS101",
+      "question_number": 2,
+      "sub_question": "a",
+      "marks_obtained": 3.5
+    },
+    {
+      "student_rollno": "CS101",
+      "question_number": 2,
+      "sub_question": "b",
+      "marks_obtained": 2.0
+    },
+    {
+      "student_rollno": "CS102",
+      "question_number": 1,
+      "sub_question": null,
+      "marks_obtained": 4.0
+    },
+    {
+      "student_rollno": "CS102",
+      "question_number": 2,
+      "sub_question": "a",
+      "marks_obtained": 3.0
+    }
+  ]
+}
+```
+
+**Field Descriptions:**
+- `test_id` (integer, required): The test ID
+- `marks_entries` (array, required): Array of marks entries
+  - `student_rollno` (string, required): Student roll number
+  - `question_number` (integer, required): Question number (1-20)
+  - `sub_question` (string, optional): Sub-question letter (a-h) or null
+  - `marks_obtained` (decimal, required): Marks scored (must be ≤ max_marks)
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Marks entry completed: 5 successful, 0 failed",
+  "data": {
+    "successful": [
+      {
+        "index": 0,
+        "student_rollno": "CS101",
+        "question": "1",
+        "marks_obtained": 5.0,
+        "max_marks": 5.0
+      },
+      {
+        "index": 1,
+        "student_rollno": "CS101",
+        "question": "2a",
+        "marks_obtained": 3.5,
+        "max_marks": 4.0
+      },
+      {
+        "index": 2,
+        "student_rollno": "CS101",
+        "question": "2b",
+        "marks_obtained": 2.0,
+        "max_marks": 3.0
+      },
+      {
+        "index": 3,
+        "student_rollno": "CS102",
+        "question": "1",
+        "marks_obtained": 4.0,
+        "max_marks": 5.0
+      },
+      {
+        "index": 4,
+        "student_rollno": "CS102",
+        "question": "2a",
+        "marks_obtained": 3.0,
+        "max_marks": 4.0
+      }
+    ],
+    "failed": [],
+    "total": 5,
+    "success_count": 5,
+    "failure_count": 0
+  }
+}
+```
+
+**Partial Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Marks entry completed: 3 successful, 2 failed",
+  "data": {
+    "successful": [
+      {
+        "index": 0,
+        "student_rollno": "CS101",
+        "question": "1",
+        "marks_obtained": 5.0,
+        "max_marks": 5.0
+      }
+    ],
+    "failed": [
+      {
+        "index": 1,
+        "entry": {
+          "student_rollno": "CS999",
+          "question_number": 1,
+          "sub_question": null,
+          "marks_obtained": 5.0
+        },
+        "reason": "Student with rollno 'CS999' not found"
+      },
+      {
+        "index": 2,
+        "entry": {
+          "student_rollno": "CS101",
+          "question_number": 1,
+          "sub_question": null,
+          "marks_obtained": 10.0
+        },
+        "reason": "Marks obtained (10) exceeds maximum marks (5)"
+      }
+    ],
+    "total": 3,
+    "success_count": 1,
+    "failure_count": 2
+  }
+}
+```
+
+**Error Responses:**
+
+**400 - Bad Request (Missing test_id):**
+```json
+{
+  "success": false,
+  "message": "Missing required field: test_id"
+}
+```
+
+**400 - Bad Request (Invalid marks_entries):**
+```json
+{
+  "success": false,
+  "message": "marks_entries must be an array"
+}
+```
+
+**400 - Bad Request (Empty array):**
+```json
+{
+  "success": false,
+  "message": "marks_entries array cannot be empty"
+}
+```
+
+**404 - Not Found:**
+```json
+{
+  "success": false,
+  "message": "Test not found"
+}
+```
+
+**Features:**
+- Validates all entries before saving
+- Handles partial failures gracefully
+- Automatically aggregates CO marks after saving
+- Returns detailed success/failure report for each entry
+- Validates marks don't exceed question maximum
+- Validates students and questions exist
+- Supports both main questions and sub-questions
