@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Eye, FileText } from "lucide-react";
+import { ViewAssessmentDialog } from "./ViewAssessmentDialog";
 import { apiService } from "@/services/api";
 import type { Course, Test } from "@/services/api";
 
@@ -22,6 +23,8 @@ interface TestsListProps {
 export function TestsList({ course, refreshTrigger }: TestsListProps) {
 	const [tests, setTests] = useState<Test[]>([]);
 	const [loading, setLoading] = useState(false);
+	const [selectedTestId, setSelectedTestId] = useState<number | null>(null);
+	const [showDetailsDialog, setShowDetailsDialog] = useState(false);
 
 	useEffect(() => {
 		if (course) {
@@ -135,11 +138,8 @@ export function TestsList({ course, refreshTrigger }: TestsListProps) {
 												variant="ghost"
 												size="sm"
 												onClick={() => {
-													// TODO: Navigate to test details page
-													console.log(
-														"View test:",
-														test.id
-													);
+													setSelectedTestId(test.id);
+													setShowDetailsDialog(true);
 												}}
 												className="gap-2"
 											>
@@ -153,6 +153,13 @@ export function TestsList({ course, refreshTrigger }: TestsListProps) {
 					</Table>
 				)}
 			</CardContent>
+
+			{/* View Assessment Details Dialog */}
+			<ViewAssessmentDialog
+				open={showDetailsDialog}
+				onOpenChange={setShowDetailsDialog}
+				testId={selectedTestId}
+			/>
 		</Card>
 	);
 }

@@ -256,7 +256,7 @@ export function EnrollStudentsDialog({
 					{students.length > 0 && (
 						<div className="space-y-2">
 							<Label>Preview ({students.length} students)</Label>
-							<div className="border border-gray-200 dark:border-gray-700 rounded-lg max-h-[300px] overflow-auto">
+							<div className="border border-gray-200 dark:border-gray-700 rounded-lg max-h-[250px] overflow-auto">
 								<table className="w-full">
 									<thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
 										<tr>

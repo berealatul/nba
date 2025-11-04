@@ -65,6 +65,11 @@ export function MarksPage() {
 		setEntryMode(null);
 	};
 
+	const handleBackToTestList = () => {
+		setSelectedTest(null);
+		setEntryMode(null);
+	};
+
 	if (!user) {
 		return null;
 	}
@@ -123,73 +128,99 @@ export function MarksPage() {
 										onBack={handleBackToSelection}
 									/>
 								) : (
-									<div className="flex flex-col items-center justify-center gap-6 py-12">
-										<div className="text-center">
-											{selectedTest ? (
-												<>
-													<h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-														{selectedTest.name}
-													</h2>
-													<p className="text-gray-500 dark:text-gray-400">
-														Choose how you want to
-														enter marks
+									<div className="space-y-6">
+										{selectedTest && (
+											<button
+												onClick={handleBackToTestList}
+												className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+											>
+												<svg
+													className="w-5 h-5"
+													fill="none"
+													stroke="currentColor"
+													viewBox="0 0 24 24"
+												>
+													<path
+														strokeLinecap="round"
+														strokeLinejoin="round"
+														strokeWidth={2}
+														d="M10 19l-7-7m0 0l7-7m-7 7h18"
+													/>
+												</svg>
+												Back to Test Selection
+											</button>
+										)}
+										<div className="flex flex-col items-center gap-6 py-12">
+											<div className="text-center">
+												{selectedTest ? (
+													<>
+														<h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+															{selectedTest.name}
+														</h2>
+														<p className="text-gray-500 dark:text-gray-400">
+															Choose how you want
+															to enter marks
+														</p>
+													</>
+												) : (
+													<>
+														<h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+															Marks Management
+														</h2>
+														<p className="text-gray-500 dark:text-gray-400">
+															Choose an entry mode
+															to get started
+														</p>
+													</>
+												)}
+											</div>
+											<div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl">
+												<button
+													onClick={() =>
+														setEntryMode(
+															"by-question"
+														)
+													}
+													className="p-6 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-all group"
+												>
+													<h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400">
+														Bulk Marks Entry
+													</h3>
+													<p className="text-sm text-gray-500 dark:text-gray-400">
+														Enter marks for multiple
+														students in tabular
+														format
 													</p>
-												</>
-											) : (
-												<>
-													<h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-														Marks Management
-													</h2>
-													<p className="text-gray-500 dark:text-gray-400">
-														Choose an entry mode to
-														get started
+												</button>
+												<button
+													onClick={() =>
+														setEntryMode("by-co")
+													}
+													className="p-6 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-all group"
+												>
+													<h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400">
+														By CO
+													</h3>
+													<p className="text-sm text-gray-500 dark:text-gray-400">
+														Enter aggregated marks
+														per CO directly
 													</p>
-												</>
-											)}
-										</div>
-										<div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl">
-											<button
-												onClick={() =>
-													setEntryMode("by-question")
-												}
-												className="p-6 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-all group"
-											>
-												<h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400">
-													Bulk Marks Entry
-												</h3>
-												<p className="text-sm text-gray-500 dark:text-gray-400">
-													Enter marks for multiple
-													students in tabular format
-												</p>
-											</button>
-											<button
-												onClick={() =>
-													setEntryMode("by-co")
-												}
-												className="p-6 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-all group"
-											>
-												<h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400">
-													By CO
-												</h3>
-												<p className="text-sm text-gray-500 dark:text-gray-400">
-													Enter aggregated marks per
-													CO directly
-												</p>
-											</button>
-											<button
-												onClick={() =>
-													setEntryMode("view-all")
-												}
-												className="p-6 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-all group"
-											>
-												<h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400">
-													View All Marks
-												</h3>
-												<p className="text-sm text-gray-500 dark:text-gray-400">
-													View marks for all students
-													in this test
-												</p>
-											</button>
+												</button>
+												<button
+													onClick={() =>
+														setEntryMode("view-all")
+													}
+													className="p-6 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-all group"
+												>
+													<h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400">
+														View All Marks
+													</h3>
+													<p className="text-sm text-gray-500 dark:text-gray-400">
+														View marks for all
+														students in this test
+													</p>
+												</button>
+											</div>
 										</div>
 									</div>
 								)}

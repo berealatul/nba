@@ -102,7 +102,7 @@ export function AssessmentsPage() {
 							<div className="p-6">
 								{showCreateForm ? (
 									<CreateAssessmentForm
-										courses={courses}
+										selectedCourse={selectedCourse}
 										onSuccess={handleAssessmentCreated}
 										onCancel={() =>
 											setShowCreateForm(false)
