@@ -273,7 +273,8 @@ Authorization: Bearer <jwt_token>
       "course_code": "CS101",
       "name": "Introduction to Programming",
       "credit": 4,
-      "syllabus": "Basic programming concepts, variables, loops...",
+      "syllabus_filename": "CS101_Syllabus.pdf",
+      "has_syllabus_pdf": true,
       "faculty_id": 3001,
       "year": 1,
       "semester": 1
@@ -283,7 +284,8 @@ Authorization: Bearer <jwt_token>
       "course_code": "CS201",
       "name": "Data Structures",
       "credit": 4,
-      "syllabus": "Arrays, linked lists, trees, graphs...",
+      "syllabus_filename": null,
+      "has_syllabus_pdf": false,
       "faculty_id": 3001,
       "year": 2,
       "semester": 1
@@ -323,43 +325,38 @@ Content-Type: application/json
   "name": "Mid Semester Examination",
   "full_marks": 50,
   "pass_marks": 20,
-  "question_link": "https://example.com/questions/mid-sem.pdf",
+  "question_paper_pdf": "base64_encoded_pdf_string_here...",
   "questions": [
     {
       "question_number": 1,
       "co": 1,
-      "max_marks": 5,
-      "description": "Define data structures and algorithms"
+      "max_marks": 5
     },
     {
       "question_number": 2,
       "sub_question": "a",
       "co": 2,
-      "max_marks": 3,
-      "description": "Explain arrays"
+      "max_marks": 3
     },
     {
       "question_number": 2,
       "sub_question": "b",
       "co": 2,
-      "max_marks": 3,
-      "description": "Explain linked lists"
+      "max_marks": 3
     },
     {
       "question_number": 5,
       "sub_question": "a",
       "is_optional": true,
       "co": 3,
-      "max_marks": 10,
-      "description": "Write algorithm for sorting (Attempt either 5a OR 5b)"
+      "max_marks": 10
     },
     {
       "question_number": 5,
       "sub_question": "b",
       "is_optional": true,
       "co": 3,
-      "max_marks": 10,
-      "description": "Write algorithm for searching (Attempt either 5a OR 5b)"
+      "max_marks": 10
     }
   ]
 }
@@ -370,14 +367,15 @@ Content-Type: application/json
 - `name`: Test name (e.g., "Mid Semester", "End Semester", "Quiz 1")
 - `full_marks`: Total marks for the test (must be > 0)
 - `pass_marks`: Minimum marks to pass (must be >= 0 and <= full_marks)
-- `question_link`: Optional URL to the question paper PDF
+- `question_paper_pdf`: Optional base64-encoded PDF file
 - `questions`: Array of questions with detailed structure
   - `question_number`: Main question number (1-20, required)
   - `sub_question`: Sub-question identifier ('a'-'h', optional)
   - `is_optional`: Boolean flag for optional questions (default: false)
   - `co`: Course Outcome number (1-6, required)
   - `max_marks`: Maximum marks (supports decimals like 2.5, min 0.5, required)
-  - `description`: Question text/description (optional)
+
+**Note**: The `question_paper_filename` is automatically generated as `courseCode_year_semester_testName.pdf` and returned in responses.
 
 **Important Validation Rules:**
 - Question numbers must be between 1 and 20
@@ -404,7 +402,8 @@ Content-Type: application/json
       "name": "Mid Semester Examination",
       "full_marks": 50,
       "pass_marks": 20,
-      "question_link": "https://example.com/questions/mid-sem.pdf"
+      "question_paper_filename": "MidSem_CS101_2024.pdf",
+      "has_question_paper_pdf": true
     },
     "questions": [
       {
@@ -415,8 +414,7 @@ Content-Type: application/json
         "question_identifier": "1",
         "is_optional": false,
         "co": 1,
-        "max_marks": 5,
-        "description": "Define data structures and algorithms"
+        "max_marks": 5
       },
       {
         "id": 2,
@@ -426,8 +424,7 @@ Content-Type: application/json
         "question_identifier": "2a",
         "is_optional": false,
         "co": 2,
-        "max_marks": 3,
-        "description": "Explain arrays"
+        "max_marks": 3
       },
       {
         "id": 3,
@@ -437,8 +434,7 @@ Content-Type: application/json
         "question_identifier": "5a",
         "is_optional": true,
         "co": 3,
-        "max_marks": 10,
-        "description": "Write algorithm for sorting"
+        "max_marks": 10
       }
     ]
   }
@@ -511,13 +507,17 @@ GET /assessment?test_id=1
       "name": "Mid Semester Examination",
       "full_marks": 50,
       "pass_marks": 20,
-      "question_link": "https://example.com/questions/mid-sem.pdf"
+      "question_paper_filename": "MidSem_CS101_2024.pdf",
+      "has_question_paper_pdf": true
     },
     "course": {
       "id": 1,
       "course_code": "CS101",
       "name": "Introduction to Programming",
       "credit": 4,
+      "syllabus_filename": "CS101_Syllabus.pdf",
+      "has_syllabus_pdf": true,
+      "faculty_id": 3001,
       "year": 1,
       "semester": 1
     },
@@ -525,24 +525,40 @@ GET /assessment?test_id=1
       {
         "id": 1,
         "test_id": 1,
+        "question_number": 1,
+        "sub_question": null,
+        "question_identifier": "1",
+        "is_optional": false,
         "co": 1,
         "max_marks": 10
       },
       {
         "id": 2,
         "test_id": 1,
+        "question_number": 2,
+        "sub_question": null,
+        "question_identifier": "2",
+        "is_optional": false,
         "co": 2,
         "max_marks": 15
       },
       {
         "id": 3,
         "test_id": 1,
+        "question_number": 3,
+        "sub_question": null,
+        "question_identifier": "3",
+        "is_optional": false,
         "co": 3,
         "max_marks": 10
       },
       {
         "id": 4,
         "test_id": 1,
+        "question_number": 4,
+        "sub_question": null,
+        "question_identifier": "4",
+        "is_optional": false,
         "co": 4,
         "max_marks": 15
       }
@@ -592,7 +608,8 @@ GET /course-tests?course_id=1
       "name": "Mid Semester Examination",
       "full_marks": 50,
       "pass_marks": 20,
-      "question_link": "https://example.com/questions/mid-sem.pdf"
+      "question_paper_filename": "MidSem_CS101_2024.pdf",
+      "has_question_paper_pdf": true
     },
     {
       "id": 2,
@@ -600,7 +617,8 @@ GET /course-tests?course_id=1
       "name": "End Semester Examination",
       "full_marks": 100,
       "pass_marks": 40,
-      "question_link": "https://example.com/questions/end-sem.pdf"
+      "question_paper_filename": "EndSem_CS101_2024.pdf",
+      "has_question_paper_pdf": true
     }
   ]
 }
@@ -850,7 +868,8 @@ GET /marks/test?test_id=1
       "name": "Mid Semester Examination",
       "full_marks": 50,
       "pass_marks": 20,
-      "question_link": "https://example.com/questions/mid-sem.pdf"
+      "question_paper_filename": "MidSem_CS101_2024.pdf",
+      "has_question_paper_pdf": true
     },
     "marks": [
       {
@@ -914,12 +933,15 @@ GET /marks/test?test_id=1
   "course_code": "string (max 20 characters)",
   "name": "string (max 255 characters)",
   "credit": "number (non-negative)",
-  "syllabus": "string|null",
+  "syllabus_filename": "string|null (auto-generated: courseCode_year_semester.pdf)",
+  "has_syllabus_pdf": "boolean (true if PDF stored)",
   "faculty_id": "number",
   "year": "number (4-digit calendar year: 1000-9999)",
   "semester": "number (positive integer)"
 }
 ```
+
+**Note**: Syllabus is stored as a PDF in the database (LONGBLOB). The filename is automatically generated from course code, year, and semester (e.g., "CS101_2024_1.pdf"). Use a separate endpoint to download the PDF if needed.
 
 ### Test Object
 ```json
@@ -929,9 +951,12 @@ GET /marks/test?test_id=1
   "name": "string (max 255 characters)",
   "full_marks": "number (> 0)",
   "pass_marks": "number (>= 0)",
-  "question_link": "string|null (URL)"
+  "question_paper_filename": "string|null (auto-generated: courseCode_year_semester_testName.pdf)",
+  "has_question_paper_pdf": "boolean (true if PDF stored)"
 }
 ```
+
+**Note**: Question paper is stored as a PDF in the database (LONGBLOB). The filename is automatically generated from course code, year, semester, and test name (e.g., "CS101_2024_1_Mid_Semester.pdf"). Use a separate endpoint to download the PDF if needed.
 
 ### Question Object
 ```json
@@ -943,10 +968,11 @@ GET /marks/test?test_id=1
   "question_identifier": "string (e.g., '1', '2a', '5b')",
   "is_optional": "boolean (default: false)",
   "co": "number (1-6, Course Outcome)",
-  "max_marks": "decimal (>= 0.5, supports decimals)",
-  "description": "string|null (question text)"
+  "max_marks": "decimal (>= 0.5, supports decimals)"
 }
 ```
+
+**Note:** Question details (text, images, etc.) are expected to be in the question paper PDF. No separate description field is stored per question.
 
 **Question Examples:**
 - Main question without sub-parts: `{"question_number": 1, "sub_question": null}` → Identifier: `"1"`
@@ -1015,7 +1041,7 @@ GET /marks/test?test_id=1
 - `name`: Required, max 255 characters
 - `full_marks`: Required, must be greater than 0
 - `pass_marks`: Required, must be >= 0 and <= full_marks
-- `question_link`: Optional, valid URL format
+- `question_paper_pdf`: Optional, base64-encoded PDF string
 
 ### Question Validation
 - `test_id`: Required, must be a valid test
@@ -1024,7 +1050,6 @@ GET /marks/test?test_id=1
 - `is_optional`: Optional, boolean (default false)
 - `co`: Required, must be between 1-6 (Course Outcome)
 - `max_marks`: Required, must be >= 0.5 (supports decimals like 2.5)
-- `description`: Optional, question text
 - **No total marks validation** - System supports optional questions and flexible test structures
 
 ### Marks Validation (by-question)

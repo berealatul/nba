@@ -19,7 +19,13 @@ class TestRepository
     public function findById($id)
     {
         try {
-            $stmt = $this->db->prepare("SELECT * FROM test WHERE id = ?");
+            // Join with course to get course_code, year, semester for filename generation
+            $stmt = $this->db->prepare("
+                SELECT t.*, c.course_code, c.year, c.semester 
+                FROM test t
+                JOIN course c ON t.course_id = c.id
+                WHERE t.id = ?
+            ");
             $stmt->execute([$id]);
             $data = $stmt->fetch();
 
@@ -30,7 +36,10 @@ class TestRepository
                     $data['name'],
                     $data['full_marks'],
                     $data['pass_marks'],
-                    $data['question_link']
+                    $data['question_paper_pdf'],
+                    $data['course_code'],
+                    $data['year'],
+                    $data['semester']
                 );
             }
             return null;
@@ -45,7 +54,14 @@ class TestRepository
     public function findByCourseId($courseId)
     {
         try {
-            $stmt = $this->db->prepare("SELECT * FROM test WHERE course_id = ? ORDER BY id DESC");
+            // Join with course to get course_code, year, semester for filename generation
+            $stmt = $this->db->prepare("
+                SELECT t.*, c.course_code, c.year, c.semester 
+                FROM test t
+                JOIN course c ON t.course_id = c.id
+                WHERE t.course_id = ? 
+                ORDER BY t.id DESC
+            ");
             $stmt->execute([$courseId]);
             $tests = [];
 
@@ -56,7 +72,10 @@ class TestRepository
                     $data['name'],
                     $data['full_marks'],
                     $data['pass_marks'],
-                    $data['question_link']
+                    $data['question_paper_pdf'],
+                    $data['course_code'],
+                    $data['year'],
+                    $data['semester']
                 );
             }
 
@@ -74,24 +93,24 @@ class TestRepository
         try {
             if ($test->getId()) {
                 // Update existing test
-                $stmt = $this->db->prepare("UPDATE test SET course_id = ?, name = ?, full_marks = ?, pass_marks = ?, question_link = ? WHERE id = ?");
+                $stmt = $this->db->prepare("UPDATE test SET course_id = ?, name = ?, full_marks = ?, pass_marks = ?, question_paper_pdf = ? WHERE id = ?");
                 return $stmt->execute([
                     $test->getCourseId(),
                     $test->getName(),
                     $test->getFullMarks(),
                     $test->getPassMarks(),
-                    $test->getQuestionLink(),
+                    $test->getQuestionPaperPdf(),
                     $test->getId()
                 ]);
             } else {
                 // Insert new test
-                $stmt = $this->db->prepare("INSERT INTO test (course_id, name, full_marks, pass_marks, question_link) VALUES (?, ?, ?, ?, ?)");
+                $stmt = $this->db->prepare("INSERT INTO test (course_id, name, full_marks, pass_marks, question_paper_pdf) VALUES (?, ?, ?, ?, ?)");
                 $result = $stmt->execute([
                     $test->getCourseId(),
                     $test->getName(),
                     $test->getFullMarks(),
                     $test->getPassMarks(),
-                    $test->getQuestionLink()
+                    $test->getQuestionPaperPdf()
                 ]);
 
                 if ($result) {

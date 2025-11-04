@@ -119,14 +119,17 @@ class AssessmentController
                 return;
             }
 
-            // Create test
+            // Create test (pass course info for filename generation)
             $test = new Test(
                 null,
                 $data['course_id'],
                 $data['name'],
                 $data['full_marks'],
                 $data['pass_marks'],
-                isset($data['question_link']) ? $data['question_link'] : null
+                isset($data['question_paper_pdf']) ? base64_decode($data['question_paper_pdf']) : null,
+                $course->getCourseCode(),
+                $course->getYear(),
+                $course->getSemester()
             );
 
             // Start transaction
@@ -159,8 +162,7 @@ class AssessmentController
                         $qData['sub_question'] ?? null,
                         $qData['is_optional'] ?? false,
                         $qData['co'],
-                        $qData['max_marks'],
-                        $qData['description'] ?? null
+                        $qData['max_marks']
                     );
                     $questions[] = $question;
                 } catch (Exception $e) {

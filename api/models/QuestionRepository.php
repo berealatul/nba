@@ -31,8 +31,7 @@ class QuestionRepository
                     $data['sub_question'],
                     $data['is_optional'],
                     $data['co'],
-                    $data['max_marks'],
-                    $data['description']
+                    $data['max_marks']
                 );
             }
             return null;
@@ -62,8 +61,7 @@ class QuestionRepository
                     $data['sub_question'],
                     $data['is_optional'],
                     $data['co'],
-                    $data['max_marks'],
-                    $data['description']
+                    $data['max_marks']
                 );
             }
 
@@ -84,7 +82,7 @@ class QuestionRepository
                 $stmt = $this->db->prepare(
                     "UPDATE question SET 
                     test_id = ?, question_number = ?, sub_question = ?, 
-                    is_optional = ?, co = ?, max_marks = ?, description = ? 
+                    is_optional = ?, co = ?, max_marks = ? 
                     WHERE id = ?"
                 );
                 return $stmt->execute([
@@ -94,15 +92,14 @@ class QuestionRepository
                     $question->getIsOptional(),
                     $question->getCo(),
                     $question->getMaxMarks(),
-                    $question->getDescription(),
                     $question->getId()
                 ]);
             } else {
                 // Insert new question
                 $stmt = $this->db->prepare(
                     "INSERT INTO question 
-                    (test_id, question_number, sub_question, is_optional, co, max_marks, description) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?)"
+                    (test_id, question_number, sub_question, is_optional, co, max_marks) 
+                    VALUES (?, ?, ?, ?, ?, ?)"
                 );
                 $result = $stmt->execute([
                     $question->getTestId(),
@@ -110,8 +107,7 @@ class QuestionRepository
                     $question->getSubQuestion(),
                     $question->getIsOptional(),
                     $question->getCo(),
-                    $question->getMaxMarks(),
-                    $question->getDescription()
+                    $question->getMaxMarks()
                 ]);
 
                 if ($result) {

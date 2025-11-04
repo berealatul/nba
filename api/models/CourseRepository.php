@@ -32,7 +32,7 @@ class CourseRepository
                     $data['faculty_id'],
                     $data['year'],
                     $data['semester'],
-                    $data['syllabus']
+                    $data['syllabus_pdf']
                 );
             }
             return null;
@@ -60,7 +60,7 @@ class CourseRepository
                     $data['faculty_id'],
                     $data['year'],
                     $data['semester'],
-                    $data['syllabus']
+                    $data['syllabus_pdf']
                 );
             }
 
@@ -89,7 +89,7 @@ class CourseRepository
                     $data['faculty_id'],
                     $data['year'],
                     $data['semester'],
-                    $data['syllabus']
+                    $data['syllabus_pdf']
                 );
             }
 
@@ -121,12 +121,12 @@ class CourseRepository
         try {
             if ($course->getId()) {
                 // Update existing course
-                $stmt = $this->db->prepare("UPDATE course SET course_code = ?, name = ?, credit = ?, syllabus = ?, faculty_id = ?, year = ?, semester = ? WHERE id = ?");
+                $stmt = $this->db->prepare("UPDATE course SET course_code = ?, name = ?, credit = ?, syllabus_pdf = ?, faculty_id = ?, year = ?, semester = ? WHERE id = ?");
                 return $stmt->execute([
                     $course->getCourseCode(),
                     $course->getName(),
                     $course->getCredit(),
-                    $course->getSyllabus(),
+                    $course->getSyllabusPdf(),
                     $course->getFacultyId(),
                     $course->getYear(),
                     $course->getSemester(),
@@ -134,12 +134,12 @@ class CourseRepository
                 ]);
             } else {
                 // Insert new course
-                $stmt = $this->db->prepare("INSERT INTO course (course_code, name, credit, syllabus, faculty_id, year, semester) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $stmt = $this->db->prepare("INSERT INTO course (course_code, name, credit, syllabus_pdf, faculty_id, year, semester) VALUES (?, ?, ?, ?, ?, ?, ?)");
                 $result = $stmt->execute([
                     $course->getCourseCode(),
                     $course->getName(),
                     $course->getCredit(),
-                    $course->getSyllabus(),
+                    $course->getSyllabusPdf(),
                     $course->getFacultyId(),
                     $course->getYear(),
                     $course->getSemester()

@@ -13,7 +13,6 @@ class Question
     private $isOptional;        // true/false
     private $co;                // 1-6
     private $maxMarks;          // decimal
-    private $description;       // optional text
 
     public function __construct(
         $id,
@@ -22,8 +21,7 @@ class Question
         $subQuestion,
         $isOptional,
         $co,
-        $maxMarks,
-        $description = null
+        $maxMarks
     ) {
         $this->id = $id;
         $this->setTestId($testId);
@@ -32,7 +30,6 @@ class Question
         $this->setIsOptional($isOptional);
         $this->setCo($co);
         $this->setMaxMarks($maxMarks);
-        $this->description = $description;
     }
 
     // Getters
@@ -63,10 +60,6 @@ class Question
     public function getMaxMarks()
     {
         return $this->maxMarks;
-    }
-    public function getDescription()
-    {
-        return $this->description;
     }
 
     /**
@@ -133,11 +126,6 @@ class Question
         $this->maxMarks = (float)$maxMarks;
     }
 
-    public function setDescription($description)
-    {
-        $this->description = $description;
-    }
-
     /**
      * Convert to array
      */
@@ -151,8 +139,7 @@ class Question
             'question_identifier' => $this->getQuestionIdentifier(),
             'is_optional' => $this->isOptional,
             'co' => $this->co,
-            'max_marks' => $this->maxMarks,
-            'description' => $this->description
+            'max_marks' => $this->maxMarks
         ];
     }
 }

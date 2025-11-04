@@ -11,16 +11,22 @@ class Test
     private $name;
     private $fullMarks;
     private $passMarks;
-    private $questionLink;
+    private $questionPaperPdf;
+    private $courseCode; // For filename generation
+    private $year; // For filename generation
+    private $semester; // For filename generation
 
-    public function __construct($id, $courseId, $name, $fullMarks, $passMarks, $questionLink = null)
+    public function __construct($id, $courseId, $name, $fullMarks, $passMarks, $questionPaperPdf = null, $courseCode = null, $year = null, $semester = null)
     {
         $this->id = $id;
         $this->setCourseId($courseId);
         $this->setName($name);
         $this->setFullMarks($fullMarks);
         $this->setPassMarks($passMarks);
-        $this->questionLink = $questionLink;
+        $this->questionPaperPdf = $questionPaperPdf;
+        $this->courseCode = $courseCode;
+        $this->year = $year;
+        $this->semester = $semester;
     }
 
     // Getters
@@ -44,9 +50,9 @@ class Test
     {
         return $this->passMarks;
     }
-    public function getQuestionLink()
+    public function getQuestionPaperPdf()
     {
-        return $this->questionLink;
+        return $this->questionPaperPdf;
     }
 
     // Setters with validation
@@ -87,9 +93,24 @@ class Test
         $this->passMarks = (int)$passMarks;
     }
 
-    public function setQuestionLink($questionLink)
+    public function setQuestionPaperPdf($questionPaperPdf)
     {
-        $this->questionLink = $questionLink;
+        $this->questionPaperPdf = $questionPaperPdf;
+    }
+
+    public function setCourseCode($courseCode)
+    {
+        $this->courseCode = $courseCode;
+    }
+
+    public function setYear($year)
+    {
+        $this->year = $year;
+    }
+
+    public function setSemester($semester)
+    {
+        $this->semester = $semester;
     }
 
     /**
@@ -97,13 +118,23 @@ class Test
      */
     public function toArray()
     {
+        // Generate filename dynamically: courseCode_year_semester_testName.pdf
+        $generatedFilename = null;
+        if (!is_null($this->questionPaperPdf) && $this->courseCode && $this->year && $this->semester) {
+            // Sanitize test name for filename (remove special chars, spaces to underscores)
+            $sanitizedTestName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $this->name);
+            $sanitizedTestName = preg_replace('/_+/', '_', $sanitizedTestName); // Remove multiple underscores
+            $generatedFilename = $this->courseCode . '_' . $this->year . '_' . $this->semester . '_' . $sanitizedTestName . '.pdf';
+        }
+
         return [
             'id' => $this->id,
             'course_id' => $this->courseId,
             'name' => $this->name,
             'full_marks' => $this->fullMarks,
             'pass_marks' => $this->passMarks,
-            'question_link' => $this->questionLink
+            'question_paper_filename' => $generatedFilename,
+            'has_question_paper_pdf' => !is_null($this->questionPaperPdf)
         ];
     }
 }

@@ -38,7 +38,7 @@ CREATE TABLE `course` (
     `course_code` VARCHAR(20) NOT NULL,
     `name` VARCHAR(255) NOT NULL,
     `credit` SMALLINT NOT NULL DEFAULT 0,
-    `syllabus` VARCHAR(500),
+    `syllabus_pdf` LONGBLOB,
     `faculty_id` INT(11) NOT NULL,
     `year` INT NOT NULL CHECK (
         `year` BETWEEN 1000 AND 9999
@@ -50,14 +50,14 @@ CREATE TABLE `course` (
     INDEX (`year`, `semester`),
     FOREIGN KEY (`faculty_id`) REFERENCES `users`(`employee_id`) ON DELETE RESTRICT
 );
--- Tests/Assessments
+-- Tests
 CREATE TABLE `test` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `course_id` BIGINT NOT NULL,
     `name` VARCHAR(255) NOT NULL,
     `full_marks` INT NOT NULL CHECK (`full_marks` > 0),
     `pass_marks` INT NOT NULL CHECK (`pass_marks` >= 0),
-    `question_link` VARCHAR(500),
+    `question_paper_pdf` LONGBLOB,
     PRIMARY KEY (`id`),
     INDEX (`course_id`),
     FOREIGN KEY (`course_id`) REFERENCES `course`(`id`) ON DELETE CASCADE
@@ -77,7 +77,6 @@ CREATE TABLE `question` (
         `co` BETWEEN 1 AND 6
     ),
     `max_marks` DECIMAL(5, 2) NOT NULL CHECK (`max_marks` >= 0.5),
-    `description` TEXT DEFAULT NULL,
     PRIMARY KEY (`id`),
     INDEX (`test_id`),
     INDEX (`test_id`, `question_number`),
@@ -338,12 +337,23 @@ VALUES (
         NULL
     );
 -- Courses
-INSERT INTO `course`
+INSERT INTO `course` (
+        `id`,
+        `course_code`,
+        `name`,
+        `credit`,
+        `syllabus_pdf`,
+        `syllabus_filename`,
+        `faculty_id`,
+        `year`,
+        `semester`
+    )
 VALUES (
         1,
         'CS101',
         'Introduction to Programming',
         4,
+        NULL,
         NULL,
         3001,
         2024,
@@ -355,6 +365,7 @@ VALUES (
         'Data Structures and Algorithms',
         4,
         NULL,
+        NULL,
         3001,
         2024,
         1
@@ -364,6 +375,7 @@ VALUES (
         'CS301',
         'Database Management Systems',
         3,
+        NULL,
         NULL,
         3002,
         2024,
@@ -375,6 +387,7 @@ VALUES (
         'Computer Networks',
         3,
         NULL,
+        NULL,
         3004,
         2024,
         2
@@ -384,6 +397,7 @@ VALUES (
         'EC201',
         'Digital Electronics',
         4,
+        NULL,
         NULL,
         3005,
         2025,
@@ -395,6 +409,7 @@ VALUES (
         'Microprocessors',
         3,
         NULL,
+        NULL,
         3006,
         2025,
         1
@@ -405,6 +420,7 @@ VALUES (
         'Thermodynamics',
         4,
         NULL,
+        NULL,
         3007,
         2025,
         2
@@ -414,6 +430,7 @@ VALUES (
         'ME301',
         'Fluid Mechanics',
         3,
+        NULL,
         NULL,
         3008,
         2025,

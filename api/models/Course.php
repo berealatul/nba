@@ -10,12 +10,12 @@ class Course
     private $courseCode;
     private $name;
     private $credit;
-    private $syllabus;
+    private $syllabusPdf;
     private $facultyId;
     private $year;
     private $semester;
 
-    public function __construct($id, $courseCode, $name, $credit, $facultyId, $year, $semester, $syllabus = null)
+    public function __construct($id, $courseCode, $name, $credit, $facultyId, $year, $semester, $syllabusPdf = null)
     {
         $this->id = $id;
         $this->setCourseCode($courseCode);
@@ -24,7 +24,7 @@ class Course
         $this->setFacultyId($facultyId);
         $this->setYear($year);
         $this->setSemester($semester);
-        $this->syllabus = $syllabus;
+        $this->syllabusPdf = $syllabusPdf;
     }
 
     // Getters
@@ -44,9 +44,9 @@ class Course
     {
         return $this->credit;
     }
-    public function getSyllabus()
+    public function getSyllabusPdf()
     {
-        return $this->syllabus;
+        return $this->syllabusPdf;
     }
     public function getFacultyId()
     {
@@ -91,9 +91,9 @@ class Course
         $this->credit = (int)$credit;
     }
 
-    public function setSyllabus($syllabus)
+    public function setSyllabusPdf($syllabusPdf)
     {
-        $this->syllabus = $syllabus;
+        $this->syllabusPdf = $syllabusPdf;
     }
 
     public function setFacultyId($facultyId)
@@ -125,12 +125,19 @@ class Course
      */
     public function toArray()
     {
+        // Generate filename dynamically: courseCode_year_semester.pdf
+        $generatedFilename = null;
+        if (!is_null($this->syllabusPdf)) {
+            $generatedFilename = $this->courseCode . '_' . $this->year . '_' . $this->semester . '.pdf';
+        }
+
         return [
             'id' => $this->id,
             'course_code' => $this->courseCode,
             'name' => $this->name,
             'credit' => $this->credit,
-            'syllabus' => $this->syllabus,
+            'syllabus_filename' => $generatedFilename,
+            'has_syllabus_pdf' => !is_null($this->syllabusPdf),
             'faculty_id' => $this->facultyId,
             'year' => $this->year,
             'semester' => $this->semester
