@@ -603,11 +603,11 @@ class MarksController
 
                     // Save raw marks
                     $rawMarks = new RawMarks(
-                        null,
                         $testId,
                         $studentRollno,
                         $question->getId(),
-                        $marksObtained
+                        $marksObtained,
+                        null
                     );
 
                     $this->rawMarksRepository->save($rawMarks);

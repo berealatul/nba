@@ -6,7 +6,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, Plus, ChevronDown } from "lucide-react";
+import { Menu, X, Plus, ChevronDown, Users } from "lucide-react";
 import type { Course } from "@/services/api";
 
 interface AssessmentsHeaderProps {
@@ -16,6 +16,7 @@ interface AssessmentsHeaderProps {
 	selectedCourse: Course | null;
 	onCourseChange: (course: Course | null) => void;
 	onCreateNew: () => void;
+	onEnrollStudents?: () => void;
 	isMarksPage?: boolean;
 }
 
@@ -26,6 +27,7 @@ export function AssessmentsHeader({
 	selectedCourse,
 	onCourseChange,
 	onCreateNew,
+	onEnrollStudents,
 	isMarksPage = false,
 }: AssessmentsHeaderProps) {
 	return (
@@ -96,12 +98,24 @@ export function AssessmentsHeader({
 					</DropdownMenuContent>
 				</DropdownMenu>
 
-				{/* Create New Button - Only show on assessments page */}
+				{/* Action Buttons - Only show on assessments page */}
 				{!isMarksPage && (
-					<Button onClick={onCreateNew} className="gap-2">
-						<Plus className="w-4 h-4" />
-						Create Assessment
-					</Button>
+					<>
+						{selectedCourse && onEnrollStudents && (
+							<Button
+								onClick={onEnrollStudents}
+								variant="outline"
+								className="gap-2"
+							>
+								<Users className="w-4 h-4" />
+								Enroll Students
+							</Button>
+						)}
+						<Button onClick={onCreateNew} className="gap-2">
+							<Plus className="w-4 h-4" />
+							Create Assessment
+						</Button>
+					</>
 				)}
 
 				<AnimatedThemeToggler />

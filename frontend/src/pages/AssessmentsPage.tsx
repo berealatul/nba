@@ -5,6 +5,7 @@ import { AssessmentsSidebar } from "@/components/assessments/AssessmentsSidebar"
 import { AssessmentsHeader } from "@/components/assessments/AssessmentsHeader";
 import { CreateAssessmentForm } from "@/components/assessments/CreateAssessmentForm";
 import { TestsList } from "@/components/assessments/TestsList";
+import { EnrollStudentsDialog } from "@/components/assessments/EnrollStudentsDialog";
 import { Toaster } from "@/components/ui/sonner";
 import { apiService } from "@/services/api";
 import type { User, Course } from "@/services/api";
@@ -15,6 +16,7 @@ export function AssessmentsPage() {
 	const [courses, setCourses] = useState<Course[]>([]);
 	const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
 	const [showCreateForm, setShowCreateForm] = useState(false);
+	const [showEnrollDialog, setShowEnrollDialog] = useState(false);
 	const [refreshTrigger, setRefreshTrigger] = useState(0);
 	const navigate = useNavigate();
 
@@ -91,6 +93,7 @@ export function AssessmentsPage() {
 						selectedCourse={selectedCourse}
 						onCourseChange={setSelectedCourse}
 						onCreateNew={() => setShowCreateForm(true)}
+						onEnrollStudents={() => setShowEnrollDialog(true)}
 					/>
 
 					{/* Dashboard Content */}
@@ -115,6 +118,13 @@ export function AssessmentsPage() {
 						</ScrollArea>
 					</main>
 				</div>
+
+				{/* Enroll Students Dialog */}
+				<EnrollStudentsDialog
+					open={showEnrollDialog}
+					onOpenChange={setShowEnrollDialog}
+					course={selectedCourse}
+				/>
 			</div>
 		</>
 	);

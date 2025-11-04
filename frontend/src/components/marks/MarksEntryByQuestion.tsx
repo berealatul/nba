@@ -52,15 +52,57 @@ export function MarksEntryByQuestion({
 			setEnrollments(enrollmentData.enrollments || []);
 			setQuestions(enrollmentData.test_info?.questions || []);
 
+			// Initialize marks structure
 			const initialMarks: Record<string, Record<string, string>> = {};
-			enrollmentData.enrollments?.forEach((enrollment) => {
+
+			// Load existing marks for each student
+			const enrollments = enrollmentData.enrollments || [];
+			const questions = enrollmentData.test_info?.questions || [];
+
+			for (const enrollment of enrollments) {
 				initialMarks[enrollment.student_rollno] = {};
-				enrollmentData.test_info?.questions?.forEach((q) => {
+
+				// Initialize all questions with empty string
+				questions.forEach((q) => {
 					initialMarks[enrollment.student_rollno][
 						q.question_identifier
 					] = "";
 				});
-			});
+
+				// Try to load existing marks for this student
+				try {
+					const studentMarks = await apiService.getStudentMarks(
+						test.id,
+						enrollment.student_rollno
+					);
+
+					// Fill in existing marks
+					if (
+						studentMarks.raw_marks &&
+						studentMarks.raw_marks.length > 0
+					) {
+						studentMarks.raw_marks.forEach((rawMark) => {
+							const questionIdentifier =
+								rawMark.question_identifier;
+							if (
+								initialMarks[enrollment.student_rollno][
+									questionIdentifier
+								] !== undefined
+							) {
+								initialMarks[enrollment.student_rollno][
+									questionIdentifier
+								] = rawMark.marks.toString();
+							}
+						});
+					}
+				} catch (error) {
+					// If student has no marks yet, continue with empty values
+					console.log(
+						`No existing marks for student ${enrollment.student_rollno}`
+					);
+				}
+			}
+
 			setMarks(initialMarks);
 		} catch (error) {
 			console.error("Failed to load data:", error);
@@ -87,6 +129,11 @@ export function MarksEntryByQuestion({
 	const handleSubmit = async () => {
 		if (!test) {
 			toast.error("Test not found");
+			return;
+		}
+
+		if (!test.id) {
+			toast.error("Test ID is missing. Please select a valid test.");
 			return;
 		}
 
@@ -149,16 +196,8 @@ export function MarksEntryByQuestion({
 				);
 			}
 
-			const resetMarks: Record<string, Record<string, string>> = {};
-			enrollments.forEach((enrollment) => {
-				resetMarks[enrollment.student_rollno] = {};
-				questions.forEach((q) => {
-					resetMarks[enrollment.student_rollno][
-						q.question_identifier
-					] = "";
-				});
-			});
-			setMarks(resetMarks);
+			// Reload the data to show updated marks
+			await loadEnrollmentsAndQuestions();
 		} catch (error) {
 			console.error("Failed to save marks:", error);
 			if (error instanceof Error) {
