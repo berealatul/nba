@@ -8,10 +8,11 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Upload, FileText, AlertCircle, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { CSVFormatInfo } from "./CSVFormatInfo";
+import { CSVFileUpload } from "./CSVFileUpload";
+import { StudentPreviewTable } from "./StudentPreviewTable";
 import { apiService } from "@/services/api";
 import type { Course } from "@/services/api";
 
@@ -203,90 +204,14 @@ export function EnrollStudentsDialog({
 				</DialogHeader>
 
 				<div className="space-y-4 py-4">
-					{/* CSV Format Info */}
-					<div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-						<div className="flex items-start gap-3">
-							<AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-							<div className="flex-1">
-								<p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-									CSV File Format
-								</p>
-								<p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
-									Your CSV should have two columns: rollno and
-									name
-								</p>
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={downloadTemplate}
-									className="text-blue-600 dark:text-blue-400"
-								>
-									<FileText className="w-4 h-4 mr-2" />
-									Download Template
-								</Button>
-							</div>
-						</div>
-					</div>
-
-					{/* File Upload */}
-					<div className="space-y-2">
-						<Label htmlFor="csv-file">Upload CSV File</Label>
-						<div className="flex gap-2">
-							<Input
-								id="csv-file"
-								ref={fileInputRef}
-								type="file"
-								accept=".csv"
-								onChange={handleFileChange}
-								disabled={uploading || enrolling}
-								className="flex-1"
-							/>
-							<Button
-								type="button"
-								variant="outline"
-								onClick={() => fileInputRef.current?.click()}
-								disabled={uploading || enrolling}
-							>
-								<Upload className="w-4 h-4" />
-							</Button>
-						</div>
-					</div>
-
-					{/* Preview */}
-					{students.length > 0 && (
-						<div className="space-y-2">
-							<Label>Preview ({students.length} students)</Label>
-							<div className="border border-gray-200 dark:border-gray-700 rounded-lg max-h-[250px] overflow-auto">
-								<table className="w-full">
-									<thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
-										<tr>
-											<th className="px-4 py-2 text-left text-sm font-semibold text-gray-900 dark:text-white">
-												Roll No
-											</th>
-											<th className="px-4 py-2 text-left text-sm font-semibold text-gray-900 dark:text-white">
-												Name
-											</th>
-										</tr>
-									</thead>
-									<tbody>
-										{students.map((student, index) => (
-											<tr
-												key={index}
-												className="border-t border-gray-200 dark:border-gray-700"
-											>
-												<td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
-													{student.rollno}
-												</td>
-												<td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
-													{student.name}
-												</td>
-											</tr>
-										))}
-									</tbody>
-								</table>
-							</div>
-						</div>
-					)}
+					<CSVFormatInfo onDownloadTemplate={downloadTemplate} />
+					<CSVFileUpload
+						fileInputRef={fileInputRef}
+						onFileChange={handleFileChange}
+						uploading={uploading}
+						enrolling={enrolling}
+					/>
+					<StudentPreviewTable students={students} />
 
 					{/* Success Message */}
 					{file && students.length > 0 && !uploading && (
