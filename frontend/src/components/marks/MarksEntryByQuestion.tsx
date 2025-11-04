@@ -1,9 +1,5 @@
 ﻿import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Save } from "lucide-react";
+import { CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { apiService } from "@/services/api";
 import type {
@@ -13,6 +9,9 @@ import type {
 	Enrollment,
 	BulkMarksEntry,
 } from "@/services/api";
+import { MarksEntryHeader } from "./MarksEntryHeader";
+import { TestInfoCard } from "./TestInfoCard";
+import { BulkMarksTable } from "./BulkMarksTable";
 
 interface MarksEntryByQuestionProps {
 	test: Test;
@@ -212,154 +211,33 @@ export function MarksEntryByQuestion({
 
 	return (
 		<div className="space-y-4">
-			<div className="flex items-center gap-4">
-				<Button variant="ghost" onClick={onBack} className="gap-2">
-					<ArrowLeft className="w-4 h-4" />
-					Back
-				</Button>
-				<div className="flex-1">
-					<h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-						Bulk Marks Entry (By Question)
-					</h2>
-					{course && (
-						<p className="text-sm text-gray-500 dark:text-gray-400">
-							{course.course_code} - {course.name}
-						</p>
-					)}
-				</div>
-			</div>
+			<MarksEntryHeader
+				title="Bulk Marks Entry (By Question)"
+				course={course}
+				onBack={onBack}
+			/>
 
-			<Card>
-				<CardHeader>
-					<div className="flex items-center justify-between">
-						<div>
-							<CardTitle>{test.name}</CardTitle>
-							<p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-								Full Marks: {test.full_marks} | Pass Marks:{" "}
-								{test.pass_marks}
-							</p>
-						</div>
-						<Button
-							onClick={handleSubmit}
-							disabled={submitting || enrollments.length === 0}
-							className="gap-2"
-						>
-							<Save className="w-4 h-4" />
-							{submitting ? "Saving..." : "Save All Marks"}
-						</Button>
-					</div>
-				</CardHeader>
+			<TestInfoCard
+				test={test}
+				onSave={handleSubmit}
+				isSaving={submitting}
+				isDisabled={enrollments.length === 0}
+			>
 				<CardContent>
 					{loading ? (
 						<div className="text-center py-8 text-gray-500">
 							Loading students and questions...
 						</div>
-					) : enrollments.length === 0 ? (
-						<div className="text-center py-8 text-gray-500">
-							No students enrolled in this course
-						</div>
-					) : questions.length === 0 ? (
-						<div className="text-center py-8 text-gray-500">
-							No questions found for this test
-						</div>
 					) : (
-						<div className="overflow-x-auto">
-							<table className="w-full border-collapse">
-								<thead>
-									<tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-										<th className="sticky left-0 z-10 px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
-											Roll No
-										</th>
-										<th className="sticky left-[100px] z-10 px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
-											Name
-										</th>
-										{questions.map((q) => (
-											<th
-												key={q.id}
-												className="px-4 py-3 text-center text-sm font-semibold text-gray-900 dark:text-white border-r border-gray-200 dark:border-gray-700"
-											>
-												<div className="flex flex-col items-center gap-1">
-													<span>
-														Q{q.question_identifier}
-													</span>
-													<div className="flex gap-1">
-														<Badge
-															variant="outline"
-															className="text-xs"
-														>
-															CO{q.co}
-														</Badge>
-														<Badge
-															variant="secondary"
-															className="text-xs"
-														>
-															{q.max_marks}
-														</Badge>
-														{q.is_optional && (
-															<Badge
-																variant="outline"
-																className="text-xs text-orange-600"
-															>
-																Opt
-															</Badge>
-														)}
-													</div>
-												</div>
-											</th>
-										))}
-									</tr>
-								</thead>
-								<tbody>
-									{enrollments.map((enrollment) => (
-										<tr
-											key={enrollment.student_rollno}
-											className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50"
-										>
-											<td className="sticky left-0 z-10 px-4 py-3 text-sm font-medium text-gray-900 dark:text-white bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
-												{enrollment.student_rollno}
-											</td>
-											<td className="sticky left-[100px] z-10 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
-												{enrollment.student_name}
-											</td>
-											{questions.map((q) => (
-												<td
-													key={q.id}
-													className="px-2 py-2 border-r border-gray-200 dark:border-gray-700"
-												>
-													<Input
-														type="number"
-														step="0.5"
-														min="0"
-														max={q.max_marks}
-														value={
-															marks[
-																enrollment
-																	.student_rollno
-															]?.[
-																q
-																	.question_identifier
-															] || ""
-														}
-														onChange={(e) =>
-															handleMarkChange(
-																enrollment.student_rollno,
-																q.question_identifier,
-																e.target.value
-															)
-														}
-														placeholder="0"
-														className="w-20 text-center"
-													/>
-												</td>
-											))}
-										</tr>
-									))}
-								</tbody>
-							</table>
-						</div>
+						<BulkMarksTable
+							questions={questions}
+							enrollments={enrollments}
+							marks={marks}
+							onMarkChange={handleMarkChange}
+						/>
 					)}
 				</CardContent>
-			</Card>
+			</TestInfoCard>
 		</div>
 	);
 }
