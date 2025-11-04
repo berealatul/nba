@@ -1,148 +1,324 @@
-# NBA Accreditation Management System
+# NBA Accreditation Management System# NBA Accreditation Management System
 
-A comprehensive PHP-based API system for managing NBA (National Board of Accreditation) assessment data including courses, tests, questions, and CO-based marks management.
 
----
 
-## 🎯 Project Overview
+A comprehensive PHP-based REST API for managing NBA (National Board of Accreditation) assessment data for educational institutions.A comprehensive PHP-based API system for managing NBA (National Board of Accreditation) assessment data including courses, tests, questions, and CO-based marks management.
 
-This system provides a complete backend API for educational institutions to manage:
-- **Course Management**: Create and manage courses with flexible year/semester system
-- **Assessment Management**: Create tests with up to 20 questions per test
-- **CO Mapping**: Map each question to Course Outcomes (CO1-CO6)
-- **Marks Management**: Dual storage system (per-question + CO-aggregated marks)
+
+
+## What is this?---
+
+
+
+This system is a backend API that enables faculty to:## 🎯 Project Overview
+
+- **Manage Courses**: Create and track courses with year/semester information
+
+- **Create Assessments**: Design tests with up to 20 questions mapped to Course Outcomes (CO1-CO6)This system provides a complete backend API for educational institutions to manage:
+
+- **Enter Marks**: Record student marks per question with automatic CO aggregation- **Course Management**: Create and manage courses with flexible year/semester system
+
+- **Track Students**: Bulk enroll students and manage enrollments- **Assessment Management**: Create tests with up to 20 questions per test
+
+- **Store Documents**: Upload and manage question papers and syllabus in PDF format- **CO Mapping**: Map each question to Course Outcomes (CO1-CO6)
+
+- **Full Control**: Complete CRUD operations for questions and marks management- **Marks Management**: Dual storage system (per-question + CO-aggregated marks)
+
 - **Role-Based Access**: Admin, HOD, Faculty, and Staff roles with JWT authentication
 
+## Key Features
+
 ### Key Features
-- ✅ **Dynamic Questions**: Up to 20 questions and 7 sub-question per test with individual max marks
-- ✅ **CO-Based Assessment**: Automatic CO aggregation from question-level marks
-- ✅ **Dual Marks Storage**: Per-question detail (rawMarks) + CO totals (marks)
-- ✅ **JWT Authentication**: Secure token-based authentication
+
+✅ **CO-Based Assessment**: Map each question to Course Outcomes (CO1-CO6) with automatic aggregation  - ✅ **Dynamic Questions**: Up to 20 questions and 7 sub-question per test with individual max marks
+
+✅ **Dual Marks Storage**: Per-question raw marks + CO-aggregated totals  - ✅ **CO-Based Assessment**: Automatic CO aggregation from question-level marks
+
+✅ **Bulk Operations**: Enroll multiple students and enter marks in bulk  - ✅ **Dual Marks Storage**: Per-question detail (rawMarks) + CO totals (marks)
+
+✅ **CRUD Operations**: Update/delete questions and marks entries  - ✅ **Full CRUD Operations**: Complete control over questions and marks management
+
+✅ **PDF Storage**: Dynamic filename generation for question papers and syllabus  - ✅ **PDF Storage**: Store question papers and syllabus with dynamic filenames
+
+✅ **JWT Authentication**: Secure role-based access (Admin, HOD, Faculty, Staff)  - ✅ **Bulk Operations**: Bulk student enrollment and marks entry
+
+✅ **RESTful API**: Clean, documented endpoints ready for frontend integration  - ✅ **JWT Authentication**: Secure token-based authentication
+
 - ✅ **CORS Enabled**: Ready for frontend integration (React/Vue/Angular)
-- ✅ **Clean Architecture**: MVC pattern with SOLID principles
 
----
+## Technology Stack- ✅ **Clean Architecture**: MVC pattern with SOLID principles
 
-## 🛠️ Technology Stack
 
-### Backend
-- **PHP**: 8.2.12
-- **Architecture**: MVC with SOLID principles
-- **Authentication**: JWT (JSON Web Tokens)
-- **Database**: MySQL 8.0+
+
+- **Backend**: PHP 8.2.12 with MVC architecture---
+
+- **Database**: MySQL 8.0+ with 8 tables
+
+- **Authentication**: JWT (JSON Web Tokens)## 🛠️ Technology Stack
+
 - **Server**: Apache 2.4 (XAMPP)
-- **Routing**: Custom router with mod_rewrite
+
+- **API Design**: RESTful with CORS support### Backend
+
+- **PHP**: 8.2.12
+
+## Quick Start- **Architecture**: MVC with SOLID principles
+
+- **Authentication**: JWT (JSON Web Tokens)
+
+### 1. Setup Database- **Database**: MySQL 8.0+
+
+```sql- **Server**: Apache 2.4 (XAMPP)
+
+-- Create database- **Routing**: Custom router with mod_rewrite
+
+CREATE DATABASE nba_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 ### Database
-- **Tables**: 8 (departments, users, course, test, question, student, rawMarks, marks)
 
-### Frontend (Separate Project)
+-- Import schema using phpMyAdmin- **Tables**: 8 (departments, users, course, test, question, student, rawMarks, marks)
+
+-- File: docs/db.sql
+
+```### Frontend (Separate Project)
+
 - **Compatible with**: React, Vue, Angular, or any modern frontend
 
----
+### 2. Configure Connection
 
-## 📋 Prerequisites
+Edit `api/config/DatabaseConfig.php` (default XAMPP settings work):---
 
-Before installation, ensure you have:
-- XAMPP (or equivalent: Apache + PHP 8.2+ + MySQL)
-- Postman (optional, for API testing)
+```php
 
----
+private $host = 'localhost';## 📋 Prerequisites
 
-## 🚀 Installation & Setup
+private $db_name = 'nba_db';
 
-### Step 1: Clone/Download Project
-```bash
-# If using Git
-git clone <repository-url> c:\xampp\htdocs\nba
+private $username = 'root';Before installation, ensure you have:
 
-# Or manually extract to c:\xampp\htdocs\nba
+private $password = '';- XAMPP (or equivalent: Apache + PHP 8.2+ + MySQL)
+
+```- Postman (optional, for API testing)
+
+
+
+### 3. Test Installation---
+
+Open browser: `http://localhost/nba/api/`  
+
+Expected: `{"message": "NBA Assessment API v1.0"}`## 🚀 Installation & Setup
+
+
+
+### 4. Login (Default Admin)### Step 1: Clone/Download Project
+
+```bash```bash
+
+POST http://localhost/nba/api/login# If using Git
+
+{git clone <repository-url> c:\xampp\htdocs\nba
+
+  "employeeIdOrEmail": "admin@nba.edu",
+
+  "password": "admin123"# Or manually extract to c:\xampp\htdocs\nba
+
+}```
+
 ```
 
 ### Step 2: Database Setup
-1. Start XAMPP and ensure Apache + MySQL are running
-2. Open phpMyAdmin (http://localhost/phpmyadmin)
-3. Create new database:
-   ```sql
-   CREATE DATABASE nba_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   ```
-4. Import schema:
-   - Click on `nba_db` database
-   - Go to **Import** tab
-   - Choose file: `docs/db.sql`
-   - Click **Go**
 
-### Step 3: Configure Database Connection
+## API Endpoints1. Start XAMPP and ensure Apache + MySQL are running
+
+2. Open phpMyAdmin (http://localhost/phpmyadmin)
+
+**17+ RESTful endpoints** across 5 categories:3. Create new database:
+
+   ```sql
+
+| Category | Endpoints | Purpose |   CREATE DATABASE nba_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+|----------|-----------|---------|   ```
+
+| **Authentication** | 4 | Login, register, profile |4. Import schema:
+
+| **Courses** | 5 | Course and test management |   - Click on `nba_db` database
+
+| **Assessments** | 3 | Create tests with CO mapping |   - Go to **Import** tab
+
+| **Marks** | 9 | Individual/bulk entry, CRUD |   - Choose file: `docs/db.sql`
+
+| **Enrollment** | 2 | Bulk student enrollment |   - Click **Go**
+
+
+
+## Documentation### Step 3: Configure Database Connection
+
 Edit `api/config/Database.php` if needed (default settings work with XAMPP):
-```php
-private $host = 'localhost';
-private $db_name = 'nba_db';
-private $username = 'root';
-private $password = '';
-```
+
+📖 **Quick API Reference**: [`docs/APIDocumentation.md`](docs/APIDocumentation.md) - Input/output for all endpoints  ```php
+
+🔧 **CRUD Operations**: [`docs/CRUD_OPERATIONS.md`](docs/CRUD_OPERATIONS.md) - Update/delete guide  private $host = 'localhost';
+
+📦 **Bulk Features**: [`docs/BULK_MARKS_FEATURE.md`](docs/BULK_MARKS_FEATURE.md) - Bulk operations  private $db_name = 'nba_db';
+
+👥 **Enrollment**: [`docs/ENROLLMENT_FEATURE.md`](docs/ENROLLMENT_FEATURE.md) - Student enrollment  private $username = 'root';
+
+🗄️ **Database Schema**: [`docs/schema.md`](docs/schema.md) - Database structure  private $password = '';
+
+⚡ **Quick Reference**: [`docs/QUICK_REFERENCE.md`](docs/QUICK_REFERENCE.md) - Developer cheat sheet  ```
+
+📝 **Implementation**: [`docs/IMPLEMENTATION_SUMMARY.md`](docs/IMPLEMENTATION_SUMMARY.md) - Full details  
 
 ### Step 4: Configure Apache (mod_rewrite)
-Ensure `.htaccess` file exists in `api/` folder with:
-```apache
-RewriteEngine On
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(.*)$ index.php [QSA,L]
-```
 
-### Step 5: Test Installation
+## Default CredentialsEnsure `.htaccess` file exists in `api/` folder with:
+
+```apache
+
+| Role | Email | Password |RewriteEngine On
+
+|------|-------|----------|RewriteCond %{REQUEST_FILENAME} !-f
+
+| Admin | admin@nba.edu | admin123 |RewriteCond %{REQUEST_FILENAME} !-d
+
+| HOD (CSE) | hod.cse@nba.edu | hod123 |RewriteRule ^(.*)$ index.php [QSA,L]
+
+| Faculty | faculty1.cse@nba.edu | faculty123 |```
+
+
+
+⚠️ **Change these in production!**### Step 5: Test Installation
+
 1. Open browser: http://localhost/nba/api/
-2. You should see: `{"message": "NBA Assessment API v1.0"}`
+
+## Example Workflow2. You should see: `{"message": "NBA Assessment API v1.0"}`
+
 3. If you get 404 or errors, ensure mod_rewrite is enabled in XAMPP
 
-### Step 6: Configure CORS (Optional)
-If using different frontend URL, edit `api/middleware/CorsMiddleware.php`:
-```php
-// Change this line to your frontend URL
+```bash
+
+# 1. Login as faculty### Step 6: Configure CORS (Optional)
+
+curl -X POST http://localhost/nba/api/login \If using different frontend URL, edit `api/middleware/CorsMiddleware.php`:
+
+  -H "Content-Type: application/json" \```php
+
+  -d '{"employeeIdOrEmail":"faculty1.cse@nba.edu","password":"faculty123"}'// Change this line to your frontend URL
+
 header("Access-Control-Allow-Origin: http://your-frontend-url:port");
+
+# 2. Get your courses```
+
+curl -X GET http://localhost/nba/api/courses \
+
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"---
+
+
+
+# 3. Create assessment## 📚 API Documentation
+
+curl -X POST http://localhost/nba/api/assessment \
+
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \### Base URL
+
+  -d '{```
+
+    "course_id": 1,http://localhost/nba/api
+
+    "name": "Mid Semester",```
+
+    "full_marks": 50,
+
+    "questions": [### Authentication
+
+      {"question_number": 1, "co": 1, "max_marks": 10}All endpoints (except auth) require JWT token in header:
+
+    ]```
+
+  }'Authorization: Bearer <your-jwt-token>
+
 ```
 
----
+# 4. Enroll students
 
-## 📚 API Documentation
+curl -X POST http://localhost/nba/api/courses/1/enroll \### API Categories
 
-### Base URL
-```
-http://localhost/nba/api
-```
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
 
-### Authentication
-All endpoints (except auth) require JWT token in header:
-```
-Authorization: Bearer <your-jwt-token>
-```
+  -d '{#### 1️⃣ Authentication & Profile (4 endpoints)
 
-### API Categories
+    "students": [{"rollno": "CS101", "name": "John Doe"}]- `POST /auth/login` - User login (returns JWT token)
 
-#### 1️⃣ Authentication & Profile (4 endpoints)
-- `POST /auth/login` - User login (returns JWT token)
-- `POST /auth/register` - Register new user
+  }'- `POST /auth/register` - Register new user
+
 - `GET /auth/profile` - Get current user profile
-- `PUT /auth/profile` - Update user profile
 
-#### 2️⃣ Assessment Management (5 endpoints)
-- `GET /courses` - List all courses
-- `POST /courses` - Create new course
-- `GET /courses/{id}` - Get course details
-- `PUT /courses/{id}` - Update course
-- `DELETE /courses/{id}` - Delete course
+# 5. Enter marks- `PUT /auth/profile` - Update user profile
 
-Plus: test and question management endpoints
+curl -X POST http://localhost/nba/api/marks/bulk \
 
-#### 3️⃣ Marks Management (4 endpoints)
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \#### 2️⃣ Assessment Management (5 endpoints)
+
+  -d '{- `GET /courses` - List all courses
+
+    "test_id": 1,- `POST /courses` - Create new course
+
+    "marks_entries": [- `GET /courses/{id}` - Get course details
+
+      {"student_rollno": "CS101", "question_number": 1, "marks_obtained": 8.5}- `PUT /courses/{id}` - Update course
+
+    ]- `DELETE /courses/{id}` - Delete course
+
+  }'
+
+```Plus: test and question management endpoints
+
+
+
+## Project Structure#### 3️⃣ Marks Management (9 endpoints)
+
 - `POST /marks/by-question` - Save per-question marks (auto-calculates CO)
-- `POST /marks/by-co` - Save CO-aggregated marks directly
-- `GET /marks` - Get marks for student + test
-- `GET /marks/test` - Get all students' marks for a test
 
-**Total**: 13 API endpoints
+```- `POST /marks/by-co` - Save CO-aggregated marks directly
 
-📖 **Full Documentation**: See `docs/APIDocumentation.md` for detailed request/response examples
+nba/- `POST /marks/bulk` - Bulk marks entry for multiple students
+
+├── api/                    # Backend API- `GET /marks` - Get marks for student + test
+
+│   ├── config/            # Database configuration- `GET /marks/test` - Get all students' marks for a test
+
+│   ├── controllers/       # Business logic- `PUT /marks/raw/{id}` - Update individual marks entry
+
+│   ├── middleware/        # Auth, CORS, Validation- `DELETE /marks/raw/{id}` - Delete individual marks entry
+
+│   ├── models/            # Entities and repositories- `DELETE /marks/student/{testId}/{studentId}` - Delete all student marks
+
+│   ├── routes/            # API routes
+
+│   ├── utils/             # JWT, Auth services#### 4️⃣ Question Management (2 endpoints)
+
+│   └── index.php          # Entry point- `PUT /questions/{id}` - Update question CO mapping
+
+├── docs/                  # Complete documentation- `DELETE /questions/{id}` - Delete question
+
+└── frontend/              # Frontend project (separate)
+
+```#### 5️⃣ Student Enrollment (2 endpoints)
+
+- `POST /enrollments/bulk` - Bulk enroll students
+
+---- `GET /enrollments/course/{courseId}` - View enrolled students
+
+
+
+**Version**: 1.0 | **Base URL**: `http://localhost/nba/api/` | **Last Updated**: January 2025**Total**: 17+ API endpoints
+
+
+📖 **Full Documentation**: 
+- Complete API reference: `docs/APIDocumentation.md`
+- CRUD operations guide: `docs/CRUD_OPERATIONS.md`
+- Bulk features: `docs/BULK_MARKS_FEATURE.md` and `docs/ENROLLMENT_FEATURE.md`
 
 ---
 
@@ -367,6 +543,9 @@ nba/
 | Document | Purpose | Location |
 |----------|---------|----------|
 | **API Reference** | Complete API endpoints with examples | `docs/APIDocumentation.md` |
+| **CRUD Operations** | Update/Delete operations for questions and marks | `docs/CRUD_OPERATIONS.md` |
+| **Bulk Marks Feature** | Bulk marks entry documentation | `docs/BULK_MARKS_FEATURE.md` |
+| **Enrollment Feature** | Bulk student enrollment guide | `docs/ENROLLMENT_FEATURE.md` |
 | **Database Schema** | ERD, table descriptions, relationships | `docs/schema.md` |
 | **Postman Collection** | Import-ready API tests | `docs/postmanAPIScript.json` |
 | **Requirements** | System requirements | `docs/requirements.txt` |
@@ -569,7 +748,10 @@ For issues, questions, or suggestions:
 ## Quick Links
 
 - 📖 [API Documentation](docs/APIDocumentation.md)
-- 🗄️ [Database Schema](docs/schema.md)
+- � [CRUD Operations Guide](docs/CRUD_OPERATIONS.md)
+- 📦 [Bulk Marks Feature](docs/BULK_MARKS_FEATURE.md)
+- 👥 [Enrollment Feature](docs/ENROLLMENT_FEATURE.md)
+- �🗄️ [Database Schema](docs/schema.md)
 - 🧪 [Postman Collection](docs/postmanAPIScript.json)
 - 📋 [Requirements](docs/requirements.txt)
 - 💾 [SQL Schema](docs/db.sql)

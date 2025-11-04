@@ -127,4 +127,50 @@ class RawMarksRepository
 
         return $coTotals;
     }
+
+    /**
+     * Find raw marks by ID
+     */
+    public function findById($id)
+    {
+        $stmt = $this->db->prepare("SELECT * FROM rawMarks WHERE id = ?");
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($row) {
+            return new RawMarks(
+                $row['test_id'],
+                $row['student_id'],
+                $row['question_id'],
+                $row['marks'],
+                $row['id']
+            );
+        }
+        return null;
+    }
+
+    /**
+     * Update existing raw marks
+     */
+    public function update(RawMarks $rawMarks)
+    {
+        $stmt = $this->db->prepare("
+            UPDATE rawMarks 
+            SET marks = ? 
+            WHERE id = ?
+        ");
+        return $stmt->execute([
+            $rawMarks->getMarks(),
+            $rawMarks->getId()
+        ]);
+    }
+
+    /**
+     * Delete raw marks by ID
+     */
+    public function delete($id)
+    {
+        $stmt = $this->db->prepare("DELETE FROM rawMarks WHERE id = ?");
+        return $stmt->execute([$id]);
+    }
 }

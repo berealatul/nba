@@ -23,6 +23,8 @@ require_once __DIR__ . '/../models/RawMarks.php';
 require_once __DIR__ . '/../models/RawMarksRepository.php';
 require_once __DIR__ . '/../models/Marks.php';
 require_once __DIR__ . '/../models/MarksRepository.php';
+require_once __DIR__ . '/../models/Enrollment.php';
+require_once __DIR__ . '/../models/EnrollmentRepository.php';
 require_once __DIR__ . '/../utils/JWTService.php';
 require_once __DIR__ . '/../utils/AuthService.php';
 require_once __DIR__ . '/../middleware/AuthMiddleware.php';
@@ -31,6 +33,7 @@ require_once __DIR__ . '/../middleware/CorsMiddleware.php';
 require_once __DIR__ . '/../controllers/UserController.php';
 require_once __DIR__ . '/../controllers/AssessmentController.php';
 require_once __DIR__ . '/../controllers/MarksController.php';
+require_once __DIR__ . '/../controllers/EnrollmentController.php';
 
 /**
  * Router Class
@@ -43,6 +46,7 @@ class Router
     private $userController;
     private $assessmentController;
     private $marksController;
+    private $enrollmentController;
 
     public function __construct()
     {
@@ -72,7 +76,8 @@ class Router
         // Initialize controllers
         $this->userController = new UserController($authService, $userRepository, $departmentRepository, $validationMiddleware);
         $this->assessmentController = new AssessmentController($courseRepository, $testRepository, $questionRepository, $validationMiddleware);
-        $this->marksController = new MarksController($studentRepository, $rawMarksRepository, $marksRepository, $questionRepository, $testRepository, $validationMiddleware);
+        $this->marksController = new MarksController($studentRepository, $rawMarksRepository, $marksRepository, $questionRepository, $testRepository, $validationMiddleware, $courseRepository);
+        $this->enrollmentController = new EnrollmentController($db);
     }
 
     /**
@@ -221,8 +226,82 @@ class Router
                 }
                 break;
 
+            case 'marks/bulk':
+                if ($method === 'POST') {
+                    $user = $this->authMiddleware->requireAuth();
+                    $_REQUEST['authenticated_user'] = $user;
+                    $this->marksController->bulkSaveMarks();
+                } else {
+                    $this->sendMethodNotAllowed();
+                }
+                break;
+
             default:
-                $this->sendNotFound();
+                // Handle dynamic routes
+                if (preg_match('#^courses/(\d+)/enroll$#', $path, $matches)) {
+                    $courseId = $matches[1];
+                    if ($method === 'POST') {
+                        $user = $this->authMiddleware->requireAuth();
+                        $this->enrollmentController->bulkEnroll($courseId, $user['employee_id']);
+                    } else {
+                        $this->sendMethodNotAllowed();
+                    }
+                } elseif (preg_match('#^courses/(\d+)/enrollments$#', $path, $matches)) {
+                    $courseId = $matches[1];
+                    if ($method === 'GET') {
+                        $user = $this->authMiddleware->requireAuth();
+                        $this->enrollmentController->getEnrollments($courseId, $user['employee_id']);
+                    } else {
+                        $this->sendMethodNotAllowed();
+                    }
+                } elseif (preg_match('#^courses/(\d+)/enroll/([A-Za-z0-9]+)$#', $path, $matches)) {
+                    $courseId = $matches[1];
+                    $rollno = $matches[2];
+                    if ($method === 'DELETE') {
+                        $user = $this->authMiddleware->requireAuth();
+                        $this->enrollmentController->removeEnrollment($courseId, $rollno, $user['employee_id']);
+                    } else {
+                        $this->sendMethodNotAllowed();
+                    }
+                } elseif (preg_match('#^questions/(\d+)$#', $path, $matches)) {
+                    $questionId = $matches[1];
+                    if ($method === 'PUT') {
+                        $user = $this->authMiddleware->requireAuth();
+                        $_REQUEST['authenticated_user'] = $user;
+                        $this->assessmentController->updateQuestion($questionId);
+                    } elseif ($method === 'DELETE') {
+                        $user = $this->authMiddleware->requireAuth();
+                        $_REQUEST['authenticated_user'] = $user;
+                        $this->assessmentController->deleteQuestion($questionId);
+                    } else {
+                        $this->sendMethodNotAllowed();
+                    }
+                } elseif (preg_match('#^marks/raw/(\d+)$#', $path, $matches)) {
+                    $rawMarksId = $matches[1];
+                    if ($method === 'PUT') {
+                        $user = $this->authMiddleware->requireAuth();
+                        $_REQUEST['authenticated_user'] = $user;
+                        $this->marksController->updateRawMarks($rawMarksId);
+                    } elseif ($method === 'DELETE') {
+                        $user = $this->authMiddleware->requireAuth();
+                        $_REQUEST['authenticated_user'] = $user;
+                        $this->marksController->deleteRawMarks($rawMarksId);
+                    } else {
+                        $this->sendMethodNotAllowed();
+                    }
+                } elseif (preg_match('#^marks/student/(\d+)/([A-Za-z0-9]+)$#', $path, $matches)) {
+                    $testId = $matches[1];
+                    $studentId = $matches[2];
+                    if ($method === 'DELETE') {
+                        $user = $this->authMiddleware->requireAuth();
+                        $_REQUEST['authenticated_user'] = $user;
+                        $this->marksController->deleteStudentMarks($testId, $studentId);
+                    } else {
+                        $this->sendMethodNotAllowed();
+                    }
+                } else {
+                    $this->sendNotFound();
+                }
                 break;
         }
     }
@@ -252,13 +331,24 @@ class Router
                 'assessment' => [
                     'POST /assessment',
                     'GET /assessment',
-                    'GET /course-tests'
+                    'GET /course-tests',
+                    'PUT /questions/{id}',
+                    'DELETE /questions/{id}'
                 ],
                 'marks' => [
                     'POST /marks/by-question',
                     'POST /marks/by-co',
+                    'POST /marks/bulk',
                     'GET /marks',
-                    'GET /marks/test'
+                    'GET /marks/test',
+                    'PUT /marks/raw/{id}',
+                    'DELETE /marks/raw/{id}',
+                    'DELETE /marks/student/{testId}/{studentId}'
+                ],
+                'enrollment' => [
+                    'POST /courses/{courseId}/enroll',
+                    'GET /courses/{courseId}/enrollments',
+                    'DELETE /courses/{courseId}/enroll/{rollno}'
                 ]
             ]
         ]);

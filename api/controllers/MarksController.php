@@ -12,6 +12,7 @@ class MarksController
     private $questionRepository;
     private $testRepository;
     private $validationMiddleware;
+    private $courseRepository;
 
     public function __construct(
         StudentRepository $studentRepository,
@@ -19,7 +20,8 @@ class MarksController
         MarksRepository $marksRepository,
         QuestionRepository $questionRepository,
         TestRepository $testRepository,
-        ValidationMiddleware $validationMiddleware
+        ValidationMiddleware $validationMiddleware,
+        CourseRepository $courseRepository = null
     ) {
         $this->studentRepository = $studentRepository;
         $this->rawMarksRepository = $rawMarksRepository;
@@ -27,6 +29,7 @@ class MarksController
         $this->questionRepository = $questionRepository;
         $this->testRepository = $testRepository;
         $this->validationMiddleware = $validationMiddleware;
+        $this->courseRepository = $courseRepository;
     }
 
     /**
@@ -297,13 +300,14 @@ class MarksController
     }
 
     /**
-     * Get all marks for a test
-     * GET /marks/test/{test_id}
+     * Get all marks for a test (CO aggregated + raw marks)
+     * GET /marks/test?test_id={test_id}&include_raw=true
      */
     public function getTestMarks()
     {
         try {
             $testId = isset($_GET['test_id']) ? $_GET['test_id'] : null;
+            $includeRaw = isset($_GET['include_raw']) && $_GET['include_raw'] === 'true';
 
             if (!$testId) {
                 $this->sendError("Missing test_id parameter", 400);
@@ -317,12 +321,40 @@ class MarksController
                 return;
             }
 
+            // Get authenticated user
+            $user = isset($_REQUEST['authenticated_user']) ? $_REQUEST['authenticated_user'] : null;
+            if (!$user) {
+                $this->sendError("Unauthorized", 401);
+                return;
+            }
+
+            // Check if user is faculty for this course
+            if (!$this->courseRepository) {
+                require_once __DIR__ . '/../models/CourseRepository.php';
+                // We need to create CourseRepository - get db from another repository
+                $this->sendError("Course authorization not available", 500);
+                return;
+            }
+
+            $course = $this->courseRepository->findById($test->getCourseId());
+
+            if (!$course || $course->getFacultyId() != $user['employee_id']) {
+                $this->sendError("You are not authorized to view marks for this test", 403);
+                return;
+            }
+
+            // Get CO aggregated marks
             $marksList = $this->marksRepository->findByTest($testId);
 
             $response = [
                 'success' => true,
                 'data' => [
                     'test' => $test->toArray(),
+                    'course' => [
+                        'id' => $course->getId(),
+                        'course_code' => $course->getCourseCode(),
+                        'name' => $course->getName()
+                    ],
                     'marks' => array_map(function ($item) {
                         return [
                             'student_id' => $item['marks']->getStudentId(),
@@ -338,6 +370,61 @@ class MarksController
                 ]
             ];
 
+            // Include raw marks if requested
+            if ($includeRaw) {
+                // Get all questions for this test
+                $questions = $this->questionRepository->findByTestId($testId);
+                $questionMap = [];
+                foreach ($questions as $question) {
+                    $questionMap[$question->getId()] = $question;
+                }
+
+                // Get raw marks for all students
+                $rawMarksData = [];
+                foreach ($marksList as $item) {
+                    $studentId = $item['marks']->getStudentId();
+                    $rawMarks = $this->rawMarksRepository->findByTestAndStudent($testId, $studentId);
+
+                    $studentRawMarks = [];
+                    foreach ($rawMarks as $rawMark) {
+                        $question = isset($questionMap[$rawMark['raw_marks']->getQuestionId()])
+                            ? $questionMap[$rawMark['raw_marks']->getQuestionId()]
+                            : null;
+
+                        if ($question) {
+                            $studentRawMarks[] = [
+                                'question_id' => $rawMark['raw_marks']->getQuestionId(),
+                                'question_number' => $rawMark['question_number'],
+                                'sub_question' => $rawMark['sub_question'],
+                                'question_identifier' => $question->getQuestionIdentifier(),
+                                'marks_obtained' => $rawMark['raw_marks']->getMarks(),
+                                'max_marks' => $question->getMaxMarks(),
+                                'co' => $rawMark['co']
+                            ];
+                        }
+                    }
+
+                    $rawMarksData[] = [
+                        'student_id' => $studentId,
+                        'student_name' => $item['student_name'],
+                        'raw_marks' => $studentRawMarks
+                    ];
+                }
+
+                $response['data']['raw_marks'] = $rawMarksData;
+                $response['data']['questions'] = array_map(function ($q) {
+                    return [
+                        'id' => $q->getId(),
+                        'question_number' => $q->getQuestionNumber(),
+                        'sub_question' => $q->getSubQuestion(),
+                        'question_identifier' => $q->getQuestionIdentifier(),
+                        'max_marks' => $q->getMaxMarks(),
+                        'co' => $q->getCo(),
+                        'is_optional' => $q->getIsOptional()
+                    ];
+                }, $questions);
+            }
+
             http_response_code(200);
             echo json_encode($response);
         } catch (Exception $e) {
@@ -345,6 +432,444 @@ class MarksController
             echo json_encode([
                 'success' => false,
                 'message' => 'Failed to retrieve test marks: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Bulk save marks for multiple students
+     * POST /marks/bulk
+     * Body: {
+     *   test_id: 1,
+     *   marks_entries: [
+     *     {
+     *       student_rollno: "CS101",
+     *       question_number: 1,
+     *       sub_question: null,
+     *       marks_obtained: 5.0
+     *     },
+     *     {
+     *       student_rollno: "CS101",
+     *       question_number: 2,
+     *       sub_question: "a",
+     *       marks_obtained: 3.5
+     *     },
+     *     {
+     *       student_rollno: "CS102",
+     *       question_number: 1,
+     *       sub_question: null,
+     *       marks_obtained: 4.0
+     *     }
+     *   ]
+     * }
+     */
+    public function bulkSaveMarks()
+    {
+        try {
+            $data = json_decode(file_get_contents('php://input'), true);
+
+            // Validate required fields
+            if (!isset($data['test_id'])) {
+                $this->sendError("Missing required field: test_id", 400);
+                return;
+            }
+
+            if (!isset($data['marks_entries']) || !is_array($data['marks_entries'])) {
+                $this->sendError("marks_entries must be an array", 400);
+                return;
+            }
+
+            if (empty($data['marks_entries'])) {
+                $this->sendError("marks_entries array cannot be empty", 400);
+                return;
+            }
+
+            $testId = $data['test_id'];
+            $marksEntries = $data['marks_entries'];
+
+            // Validate test exists
+            $test = $this->testRepository->findById($testId);
+            if (!$test) {
+                $this->sendError("Test not found", 404);
+                return;
+            }
+
+            // Get all questions for this test
+            $questions = $this->questionRepository->findByTestId($testId);
+            if (empty($questions)) {
+                $this->sendError("No questions found for this test", 400);
+                return;
+            }
+
+            // Create a map for quick question lookup
+            $questionMap = [];
+            foreach ($questions as $question) {
+                $key = $question->getQuestionNumber();
+                if ($question->getSubQuestion()) {
+                    $key .= '_' . $question->getSubQuestion();
+                }
+                $questionMap[$key] = $question;
+            }
+
+            // Track results
+            $results = [
+                'successful' => [],
+                'failed' => [],
+                'total' => count($marksEntries),
+                'success_count' => 0,
+                'failure_count' => 0
+            ];
+
+            // Track students for CO aggregation
+            $studentsProcessed = [];
+
+            // Process each marks entry
+            foreach ($marksEntries as $index => $entry) {
+                // Validate entry structure
+                if (
+                    !isset($entry['student_rollno']) || !isset($entry['question_number']) ||
+                    !isset($entry['marks_obtained'])
+                ) {
+                    $results['failed'][] = [
+                        'index' => $index,
+                        'entry' => $entry,
+                        'reason' => 'Missing required fields (student_rollno, question_number, or marks_obtained)'
+                    ];
+                    $results['failure_count']++;
+                    continue;
+                }
+
+                $studentRollno = trim($entry['student_rollno']);
+                $questionNumber = $entry['question_number'];
+                $subQuestion = isset($entry['sub_question']) ? trim($entry['sub_question']) : null;
+                $marksObtained = $entry['marks_obtained'];
+
+                // Normalize empty string to null for sub_question
+                if ($subQuestion === '' || $subQuestion === 'null') {
+                    $subQuestion = null;
+                }
+
+                try {
+                    // Validate student exists
+                    $student = $this->studentRepository->findByRollno($studentRollno);
+                    if (!$student) {
+                        $results['failed'][] = [
+                            'index' => $index,
+                            'entry' => $entry,
+                            'reason' => "Student with rollno '$studentRollno' not found"
+                        ];
+                        $results['failure_count']++;
+                        continue;
+                    }
+
+                    // Find the question
+                    $questionKey = $questionNumber;
+                    if ($subQuestion) {
+                        $questionKey .= '_' . strtolower($subQuestion);
+                    }
+
+                    if (!isset($questionMap[$questionKey])) {
+                        $results['failed'][] = [
+                            'index' => $index,
+                            'entry' => $entry,
+                            'reason' => "Question $questionNumber" . ($subQuestion ? $subQuestion : '') . " not found in this test"
+                        ];
+                        $results['failure_count']++;
+                        continue;
+                    }
+
+                    $question = $questionMap[$questionKey];
+
+                    // Validate marks
+                    if (!is_numeric($marksObtained) || $marksObtained < 0) {
+                        $results['failed'][] = [
+                            'index' => $index,
+                            'entry' => $entry,
+                            'reason' => 'Marks must be a non-negative number'
+                        ];
+                        $results['failure_count']++;
+                        continue;
+                    }
+
+                    if ($marksObtained > $question->getMaxMarks()) {
+                        $results['failed'][] = [
+                            'index' => $index,
+                            'entry' => $entry,
+                            'reason' => "Marks obtained ($marksObtained) exceeds maximum marks ({$question->getMaxMarks()})"
+                        ];
+                        $results['failure_count']++;
+                        continue;
+                    }
+
+                    // Save raw marks
+                    $rawMarks = new RawMarks(
+                        null,
+                        $testId,
+                        $studentRollno,
+                        $question->getId(),
+                        $marksObtained
+                    );
+
+                    $this->rawMarksRepository->save($rawMarks);
+
+                    // Track student for CO aggregation
+                    $studentsProcessed[$studentRollno] = true;
+
+                    $results['successful'][] = [
+                        'index' => $index,
+                        'student_rollno' => $studentRollno,
+                        'question' => $question->getQuestionIdentifier(),
+                        'marks_obtained' => $marksObtained,
+                        'max_marks' => $question->getMaxMarks()
+                    ];
+                    $results['success_count']++;
+                } catch (Exception $e) {
+                    $results['failed'][] = [
+                        'index' => $index,
+                        'entry' => $entry,
+                        'reason' => 'Error: ' . $e->getMessage()
+                    ];
+                    $results['failure_count']++;
+                }
+            }
+
+            // Aggregate CO marks for all processed students
+            foreach (array_keys($studentsProcessed) as $studentRollno) {
+                try {
+                    $this->marksRepository->aggregateFromRawMarks($testId, $studentRollno);
+                } catch (Exception $e) {
+                    // Log but don't fail the entire operation
+                    error_log("Failed to aggregate CO marks for student $studentRollno: " . $e->getMessage());
+                }
+            }
+
+            // Return results
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'message' => "Marks entry completed: {$results['success_count']} successful, {$results['failure_count']} failed",
+                'data' => $results
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to save marks: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Update individual marks entry
+     * PUT /marks/raw/{rawMarksId}
+     */
+    public function updateRawMarks($rawMarksId)
+    {
+        try {
+            $userData = $_REQUEST['authenticated_user'];
+
+            if ($userData['role'] !== 'faculty') {
+                http_response_code(403);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Access denied. Only faculty can update marks.'
+                ]);
+                return;
+            }
+
+            $data = json_decode(file_get_contents('php://input'), true);
+
+            if (!isset($data['marks_obtained'])) {
+                $this->sendError("marks_obtained is required", 400);
+                return;
+            }
+
+            // Find existing raw marks
+            $rawMarks = $this->rawMarksRepository->findById($rawMarksId);
+            if (!$rawMarks) {
+                $this->sendError("Marks entry not found", 404);
+                return;
+            }
+
+            // Verify authorization - check if test belongs to faculty's course
+            $test = $this->testRepository->findById($rawMarks->getTestId());
+            if (!$test) {
+                $this->sendError("Test not found", 404);
+                return;
+            }
+
+            if (!$this->courseRepository) {
+                $this->sendError("Course authorization not available", 500);
+                return;
+            }
+
+            $course = $this->courseRepository->findById($test->getCourseId());
+            if (!$course || $course->getFacultyId() != $userData['employee_id']) {
+                $this->sendError("Unauthorized to update marks for this test", 403);
+                return;
+            }
+
+            // Validate new marks
+            $question = $this->questionRepository->findById($rawMarks->getQuestionId());
+            if (!$question) {
+                $this->sendError("Question not found", 404);
+                return;
+            }
+
+            $marksObtained = $data['marks_obtained'];
+            if (!is_numeric($marksObtained) || $marksObtained < 0) {
+                $this->sendError("Marks must be a non-negative number", 400);
+                return;
+            }
+
+            if ($marksObtained > $question->getMaxMarks()) {
+                $this->sendError("Marks obtained ($marksObtained) exceeds maximum marks ({$question->getMaxMarks()})", 400);
+                return;
+            }
+
+            // Update marks
+            $rawMarks->setMarks($marksObtained);
+            $this->rawMarksRepository->update($rawMarks);
+
+            // Re-aggregate CO marks for this student
+            $this->marksRepository->aggregateFromRawMarks($rawMarks->getTestId(), $rawMarks->getStudentId());
+
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Marks updated successfully',
+                'data' => [
+                    'raw_marks' => $rawMarks->toArray(),
+                    'question' => $question->toArray()
+                ]
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to update marks: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Delete marks entry
+     * DELETE /marks/raw/{rawMarksId}
+     */
+    public function deleteRawMarks($rawMarksId)
+    {
+        try {
+            $userData = $_REQUEST['authenticated_user'];
+
+            if ($userData['role'] !== 'faculty') {
+                http_response_code(403);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Access denied. Only faculty can delete marks.'
+                ]);
+                return;
+            }
+
+            // Find existing raw marks
+            $rawMarks = $this->rawMarksRepository->findById($rawMarksId);
+            if (!$rawMarks) {
+                $this->sendError("Marks entry not found", 404);
+                return;
+            }
+
+            // Verify authorization
+            $test = $this->testRepository->findById($rawMarks->getTestId());
+            if (!$test) {
+                $this->sendError("Test not found", 404);
+                return;
+            }
+
+            if (!$this->courseRepository) {
+                $this->sendError("Course authorization not available", 500);
+                return;
+            }
+
+            $course = $this->courseRepository->findById($test->getCourseId());
+            if (!$course || $course->getFacultyId() != $userData['employee_id']) {
+                $this->sendError("Unauthorized to delete marks for this test", 403);
+                return;
+            }
+
+            $testId = $rawMarks->getTestId();
+            $studentId = $rawMarks->getStudentId();
+
+            // Delete marks
+            $this->rawMarksRepository->delete($rawMarksId);
+
+            // Re-aggregate CO marks for this student
+            $this->marksRepository->aggregateFromRawMarks($testId, $studentId);
+
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Marks entry deleted successfully'
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to delete marks: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Delete all marks for a student in a test
+     * DELETE /marks/student/{testId}/{studentId}
+     */
+    public function deleteStudentMarks($testId, $studentId)
+    {
+        try {
+            $userData = $_REQUEST['authenticated_user'];
+
+            if ($userData['role'] !== 'faculty') {
+                http_response_code(403);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Access denied. Only faculty can delete marks.'
+                ]);
+                return;
+            }
+
+            // Verify authorization
+            $test = $this->testRepository->findById($testId);
+            if (!$test) {
+                $this->sendError("Test not found", 404);
+                return;
+            }
+
+            if (!$this->courseRepository) {
+                $this->sendError("Course authorization not available", 500);
+                return;
+            }
+
+            $course = $this->courseRepository->findById($test->getCourseId());
+            if (!$course || $course->getFacultyId() != $userData['employee_id']) {
+                $this->sendError("Unauthorized to delete marks for this test", 403);
+                return;
+            }
+
+            // Delete all raw marks for this student in this test
+            $this->rawMarksRepository->deleteByTestAndStudent($testId, $studentId);
+
+            // Delete aggregated CO marks
+            $this->marksRepository->deleteByTestAndStudent($testId, $studentId);
+
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'message' => 'All marks for student deleted successfully'
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to delete student marks: ' . $e->getMessage()
             ]);
         }
     }

@@ -126,4 +126,48 @@ class MarksRepository
         $stmt->execute([$testId, $studentId]);
         return $stmt->fetchColumn() > 0;
     }
+
+    /**
+     * Aggregate CO marks from raw marks for a student in a test
+     */
+    public function aggregateFromRawMarks($testId, $studentId)
+    {
+        // Calculate CO totals from raw marks
+        $stmt = $this->db->prepare("
+            SELECT q.co, SUM(r.marks) as total
+            FROM rawMarks r
+            JOIN question q ON r.question_id = q.id
+            WHERE r.test_id = ? AND r.student_id = ?
+            GROUP BY q.co
+        ");
+        $stmt->execute([$testId, $studentId]);
+
+        $coTotals = [
+            'CO1' => 0,
+            'CO2' => 0,
+            'CO3' => 0,
+            'CO4' => 0,
+            'CO5' => 0,
+            'CO6' => 0
+        ];
+
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $coKey = 'CO' . $row['co'];
+            $coTotals[$coKey] = (float)$row['total'];
+        }
+
+        // Create or update marks record
+        $marks = new Marks(
+            $studentId,
+            $testId,
+            $coTotals['CO1'],
+            $coTotals['CO2'],
+            $coTotals['CO3'],
+            $coTotals['CO4'],
+            $coTotals['CO5'],
+            $coTotals['CO6']
+        );
+
+        return $this->save($marks);
+    }
 }

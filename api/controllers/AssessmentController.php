@@ -334,4 +334,155 @@ class AssessmentController
             ]);
         }
     }
+
+    /**
+     * Update question CO mapping
+     * PUT /questions/{questionId}
+     */
+    public function updateQuestion($questionId)
+    {
+        try {
+            $userData = $_REQUEST['authenticated_user'];
+
+            if ($userData['role'] !== 'faculty') {
+                http_response_code(403);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Access denied. Only faculty can update questions.'
+                ]);
+                return;
+            }
+
+            $data = $this->validationMiddleware->getJsonInput();
+            if (!$data) {
+                throw new Exception("Invalid JSON input");
+            }
+
+            // Find existing question
+            $question = $this->questionRepository->findById($questionId);
+            if (!$question) {
+                http_response_code(404);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Question not found'
+                ]);
+                return;
+            }
+
+            // Verify test and course belong to faculty
+            $test = $this->testRepository->findById($question->getTestId());
+            if (!$test) {
+                http_response_code(404);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Test not found'
+                ]);
+                return;
+            }
+
+            $course = $this->courseRepository->findById($test->getCourseId());
+            if (!$course || $course->getFacultyId() != $userData['employee_id']) {
+                http_response_code(403);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Unauthorized to update this question'
+                ]);
+                return;
+            }
+
+            // Update question properties
+            if (isset($data['co'])) {
+                $question->setCo($data['co']);
+            }
+            if (isset($data['max_marks'])) {
+                $question->setMaxMarks($data['max_marks']);
+            }
+            if (isset($data['is_optional'])) {
+                $question->setIsOptional($data['is_optional']);
+            }
+
+            // Save updated question
+            $this->questionRepository->save($question);
+
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Question updated successfully',
+                'data' => $question->toArray()
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to update question: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Delete question
+     * DELETE /questions/{questionId}
+     */
+    public function deleteQuestion($questionId)
+    {
+        try {
+            $userData = $_REQUEST['authenticated_user'];
+
+            if ($userData['role'] !== 'faculty') {
+                http_response_code(403);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Access denied. Only faculty can delete questions.'
+                ]);
+                return;
+            }
+
+            // Find existing question
+            $question = $this->questionRepository->findById($questionId);
+            if (!$question) {
+                http_response_code(404);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Question not found'
+                ]);
+                return;
+            }
+
+            // Verify test and course belong to faculty
+            $test = $this->testRepository->findById($question->getTestId());
+            if (!$test) {
+                http_response_code(404);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Test not found'
+                ]);
+                return;
+            }
+
+            $course = $this->courseRepository->findById($test->getCourseId());
+            if (!$course || $course->getFacultyId() != $userData['employee_id']) {
+                http_response_code(403);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Unauthorized to delete this question'
+                ]);
+                return;
+            }
+
+            // Delete question
+            $this->questionRepository->delete($questionId);
+
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Question deleted successfully'
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to delete question: ' . $e->getMessage()
+            ]);
+        }
+    }
 }
