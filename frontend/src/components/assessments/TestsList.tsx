@@ -10,7 +10,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Eye, FileText, ExternalLink } from "lucide-react";
+import { Eye, FileText } from "lucide-react";
 import { apiService } from "@/services/api";
 import type { Course, Test } from "@/services/api";
 
@@ -38,6 +38,8 @@ export function TestsList({ course, refreshTrigger }: TestsListProps) {
 		setLoading(true);
 		try {
 			const testsData = await apiService.getCourseTests(course.id);
+			console.log("Tests received in component:", testsData);
+
 			// Ensure testsData is an array
 			setTests(Array.isArray(testsData) ? testsData : []);
 		} catch (error) {
@@ -106,9 +108,6 @@ export function TestsList({ course, refreshTrigger }: TestsListProps) {
 								<TableHead className="text-center">
 									Pass Marks
 								</TableHead>
-								<TableHead className="text-center">
-									Question Paper
-								</TableHead>
 								<TableHead className="text-right">
 									Actions
 								</TableHead>
@@ -130,31 +129,6 @@ export function TestsList({ course, refreshTrigger }: TestsListProps) {
 											<Badge variant="outline">
 												{test.pass_marks}
 											</Badge>
-										</TableCell>
-										<TableCell className="text-center">
-											{test.question_link ? (
-												<Button
-													variant="ghost"
-													size="sm"
-													asChild
-												>
-													<a
-														href={
-															test.question_link
-														}
-														target="_blank"
-														rel="noopener noreferrer"
-														className="gap-2"
-													>
-														<ExternalLink className="w-4 h-4" />
-														View
-													</a>
-												</Button>
-											) : (
-												<span className="text-gray-400 text-sm">
-													N/A
-												</span>
-											)}
 										</TableCell>
 										<TableCell className="text-right">
 											<Button

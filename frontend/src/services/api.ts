@@ -48,7 +48,6 @@ export interface Question {
 	is_optional?: boolean;
 	co: number;
 	max_marks: number;
-	description?: string;
 }
 
 export interface QuestionResponse extends Question {
@@ -63,7 +62,6 @@ export interface Test {
 	name: string;
 	full_marks: number;
 	pass_marks: number;
-	question_link: string | null;
 }
 
 export interface CreateAssessmentRequest {
@@ -71,7 +69,6 @@ export interface CreateAssessmentRequest {
 	name: string;
 	full_marks: number;
 	pass_marks: number;
-	question_link?: string;
 	questions: Question[];
 }
 
@@ -154,6 +151,51 @@ export interface Student {
 	rollno: string;
 	name: string;
 	dept: number;
+}
+
+export interface Enrollment {
+	student_rollno: string;
+	student_name: string;
+	enrolled_at: string;
+}
+
+export interface BulkMarksEntry {
+	student_rollno: string;
+	question_number: number;
+	sub_question: string | null;
+	marks_obtained: number;
+}
+
+export interface BulkMarksSaveRequest {
+	test_id: number;
+	marks_entries: BulkMarksEntry[];
+}
+
+export interface BulkMarksSaveResponse {
+	success: boolean;
+	message: string;
+	data: {
+		successful: BulkMarksEntry[];
+		failed: Array<BulkMarksEntry & { reason: string }>;
+		total: number;
+		success_count: number;
+		failure_count: number;
+	};
+}
+
+export interface CourseEnrollmentsResponse {
+	success: boolean;
+	data: {
+		course_id: number;
+		course_code: string;
+		enrollment_count: number;
+		enrollments: Enrollment[];
+		test_info?: {
+			test_id: number;
+			test_name: string;
+			questions: QuestionResponse[];
+		};
+	};
 }
 
 class ApiService {
@@ -275,9 +317,9 @@ class ApiService {
 			throw new Error(data.message || "Failed to fetch tests");
 		}
 
-		// API returns { data: { course: {...}, tests: [...] } }
-		// We need to extract the tests array
-		if (data.data && Array.isArray(data.data.tests)) {
+		// API returns { success: true, message: "...", data: { course: {...}, tests: [...] } }
+		// We need to extract the tests array from data.data.tests
+		if (data.data && data.data.tests && Array.isArray(data.data.tests)) {
 			return data.data.tests;
 		}
 
@@ -370,6 +412,50 @@ class ApiService {
 
 		if (!response.ok) {
 			throw new Error(data.message || "Failed to save marks");
+		}
+
+		return data.data;
+	}
+
+	async saveBulkMarks(
+		bulkMarksData: BulkMarksSaveRequest
+	): Promise<BulkMarksSaveResponse> {
+		const response = await fetch(`${API_BASE_URL}/marks/bulk`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${this.token}`,
+			},
+			body: JSON.stringify(bulkMarksData),
+		});
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			throw new Error(data.message || "Failed to save bulk marks");
+		}
+
+		return data;
+	}
+
+	async getCourseEnrollments(
+		courseId: number,
+		testId?: number
+	): Promise<CourseEnrollmentsResponse["data"]> {
+		const url = testId
+			? `${API_BASE_URL}/courses/${courseId}/enrollments?test_id=${testId}`
+			: `${API_BASE_URL}/courses/${courseId}/enrollments`;
+
+		const response = await fetch(url, {
+			headers: {
+				Authorization: `Bearer ${this.token}`,
+			},
+		});
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			throw new Error(data.message || "Failed to fetch enrollments");
 		}
 
 		return data.data;

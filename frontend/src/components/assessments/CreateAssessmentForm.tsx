@@ -29,9 +29,26 @@ export function CreateAssessmentForm({
 	const [name, setName] = useState("");
 	const [fullMarks, setFullMarks] = useState("");
 	const [passMarks, setPassMarks] = useState("");
-	const [questionLink, setQuestionLink] = useState("");
 	const [questions, setQuestions] = useState<Question[]>([]);
 	const [isSubmitting, setIsSubmitting] = useState(false);
+
+	const testTypes = ["Test-1", "Mid-Term", "Test-2", "End-Term"];
+
+	const testMarksDefaults: Record<string, number> = {
+		"Test-1": 10,
+		"Mid-Term": 30,
+		"Test-2": 10,
+		"End-Term": 50,
+	};
+
+	const handleTestTypeChange = (testType: string) => {
+		setName(testType);
+		const defaultFullMarks = testMarksDefaults[testType];
+		setFullMarks(defaultFullMarks.toString());
+		// Calculate 34% of full marks for pass marks
+		const defaultPassMarks = Math.round(defaultFullMarks * 0.34 * 2) / 2; // Round to nearest 0.5
+		setPassMarks(defaultPassMarks.toString());
+	};
 
 	const selectedCourse = courses.find((c) => c.id.toString() === courseId);
 
@@ -42,7 +59,6 @@ export function CreateAssessmentForm({
 			is_optional: false,
 			co: 1,
 			max_marks: 10,
-			description: "",
 		};
 		setQuestions([...questions, newQuestion]);
 	};
@@ -105,7 +121,6 @@ export function CreateAssessmentForm({
 				name,
 				full_marks: parseFloat(fullMarks),
 				pass_marks: parseFloat(passMarks),
-				question_link: questionLink || undefined,
 				questions,
 			});
 
@@ -132,59 +147,80 @@ export function CreateAssessmentForm({
 					<CardTitle>Assessment Details</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
-					{/* Course Selection */}
-					<div className="space-y-2">
-						<Label>Course *</Label>
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button
-									type="button"
-									variant="outline"
-									className="w-full justify-between"
-								>
-									<span className="truncate">
-										{selectedCourse
-											? `${selectedCourse.course_code} - ${selectedCourse.name}`
-											: "Select Course"}
-									</span>
-									<ChevronDown className="w-4 h-4 ml-2" />
-								</Button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent className="w-[500px]">
-								{courses.map((course) => (
-									<DropdownMenuItem
-										key={course.id}
-										onClick={() =>
-											setCourseId(course.id.toString())
-										}
-									>
-										<div className="flex flex-col">
-											<span className="font-medium">
-												{course.course_code} -{" "}
-												{course.name}
-											</span>
-											<span className="text-xs text-gray-500">
-												{course.semester} Semester, Year{" "}
-												{course.year}
-											</span>
-										</div>
-									</DropdownMenuItem>
-								))}
-							</DropdownMenuContent>
-						</DropdownMenu>
-					</div>
-
 					<div className="grid grid-cols-2 gap-4">
-						{/* Test Name */}
-						<div className="col-span-2 space-y-2">
-							<Label htmlFor="name">Assessment Name *</Label>
-							<Input
-								id="name"
-								value={name}
-								onChange={(e) => setName(e.target.value)}
-								placeholder="e.g., Mid-Term Examination"
-								required
-							/>
+						{/* Course Selection */}
+						<div className="space-y-2">
+							<Label>Course *</Label>
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button
+										type="button"
+										variant="outline"
+										className="w-full justify-between"
+									>
+										<span className="truncate">
+											{selectedCourse
+												? `${selectedCourse.course_code} - ${selectedCourse.name}`
+												: "Select Course"}
+										</span>
+										<ChevronDown className="w-4 h-4 ml-2" />
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent className="w-[500px]">
+									{courses.map((course) => (
+										<DropdownMenuItem
+											key={course.id}
+											onClick={() =>
+												setCourseId(
+													course.id.toString()
+												)
+											}
+										>
+											<div className="flex flex-col">
+												<span className="font-medium">
+													{course.course_code} -{" "}
+													{course.name}
+												</span>
+												<span className="text-xs text-gray-500">
+													{course.semester} Semester,
+													Year {course.year}
+												</span>
+											</div>
+										</DropdownMenuItem>
+									))}
+								</DropdownMenuContent>
+							</DropdownMenu>
+						</div>
+
+						{/* Assessment Name */}
+						<div className="space-y-2">
+							<Label>Assessment Name *</Label>
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button
+										type="button"
+										variant="outline"
+										className="w-full justify-between"
+									>
+										<span>
+											{name || "Select Assessment Type"}
+										</span>
+										<ChevronDown className="w-4 h-4 ml-2" />
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent className="w-full">
+									{testTypes.map((type) => (
+										<DropdownMenuItem
+											key={type}
+											onClick={() =>
+												handleTestTypeChange(type)
+											}
+										>
+											{type}
+										</DropdownMenuItem>
+									))}
+								</DropdownMenuContent>
+							</DropdownMenu>
 						</div>
 
 						{/* Full Marks */}
@@ -216,22 +252,6 @@ export function CreateAssessmentForm({
 								required
 							/>
 						</div>
-
-						{/* Question Paper Link */}
-						<div className="col-span-2 space-y-2">
-							<Label htmlFor="questionLink">
-								Question Paper Link
-							</Label>
-							<Input
-								id="questionLink"
-								type="url"
-								value={questionLink}
-								onChange={(e) =>
-									setQuestionLink(e.target.value)
-								}
-								placeholder="https://example.com/question-paper.pdf"
-							/>
-						</div>
 					</div>
 				</CardContent>
 			</Card>
@@ -250,24 +270,45 @@ export function CreateAssessmentForm({
 						Add Question
 					</Button>
 				</CardHeader>
-				<CardContent className="space-y-4">
+				<CardContent>
 					{questions.length === 0 ? (
 						<div className="text-center py-8 text-gray-500 dark:text-gray-400">
 							No questions added yet. Click "Add Question" to
 							start.
 						</div>
 					) : (
-						questions.map((question, index) => (
-							<Card
-								key={index}
-								className="border border-gray-200 dark:border-gray-700"
-							>
-								<CardContent className="p-4">
-									<div className="flex items-start gap-4">
-										<div className="flex-1 grid grid-cols-2 gap-4">
+						<div className="overflow-x-auto">
+							<table className="w-full border-collapse">
+								<thead>
+									<tr className="border-b border-gray-200 dark:border-gray-700">
+										<th className="text-left p-3 text-sm font-semibold">
+											Q.No
+										</th>
+										<th className="text-left p-3 text-sm font-semibold">
+											Sub-Q
+										</th>
+										<th className="text-left p-3 text-sm font-semibold">
+											CO
+										</th>
+										<th className="text-left p-3 text-sm font-semibold">
+											Max Marks
+										</th>
+										<th className="text-center p-3 text-sm font-semibold">
+											Optional
+										</th>
+										<th className="text-center p-3 text-sm font-semibold">
+											Action
+										</th>
+									</tr>
+								</thead>
+								<tbody>
+									{questions.map((question, index) => (
+										<tr
+											key={index}
+											className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900"
+										>
 											{/* Question Number */}
-											<div className="space-y-2">
-												<Label>Question Number *</Label>
+											<td className="p-3">
 												<Input
 													type="number"
 													min="1"
@@ -284,15 +325,13 @@ export function CreateAssessmentForm({
 																) || 1,
 														})
 													}
+													className="w-20"
 													required
 												/>
-											</div>
+											</td>
 
 											{/* Sub-Question */}
-											<div className="space-y-2">
-												<Label>
-													Sub-Question (a-h)
-												</Label>
+											<td className="p-3">
 												<Input
 													maxLength={1}
 													value={
@@ -315,15 +354,13 @@ export function CreateAssessmentForm({
 															);
 														}
 													}}
-													placeholder="Leave empty for main question"
+													className="w-16"
+													placeholder="a-h"
 												/>
-											</div>
+											</td>
 
 											{/* CO Selection */}
-											<div className="space-y-2">
-												<Label>
-													Course Outcome (CO) *
-												</Label>
+											<td className="p-3">
 												<DropdownMenu>
 													<DropdownMenuTrigger
 														asChild
@@ -331,7 +368,8 @@ export function CreateAssessmentForm({
 														<Button
 															type="button"
 															variant="outline"
-															className="w-full justify-between"
+															className="w-24 justify-between"
+															size="sm"
 														>
 															CO{question.co}
 															<ChevronDown className="w-4 h-4" />
@@ -357,11 +395,10 @@ export function CreateAssessmentForm({
 														)}
 													</DropdownMenuContent>
 												</DropdownMenu>
-											</div>
+											</td>
 
 											{/* Max Marks */}
-											<div className="space-y-2">
-												<Label>Max Marks *</Label>
+											<td className="p-3">
 												<Input
 													type="number"
 													step="0.5"
@@ -376,68 +413,58 @@ export function CreateAssessmentForm({
 																) || 0.5,
 														})
 													}
+													className="w-24"
 													required
 												/>
-											</div>
-
-											{/* Description */}
-											<div className="col-span-2 space-y-2">
-												<Label>Description</Label>
-												<Input
-													value={question.description}
-													onChange={(e) =>
-														updateQuestion(index, {
-															description:
-																e.target.value,
-														})
-													}
-													placeholder="Brief description of the question"
-												/>
-											</div>
+											</td>
 
 											{/* Optional Checkbox */}
-											<div className="col-span-2 flex items-center gap-2">
-												<input
-													type="checkbox"
-													id={`optional-${index}`}
-													checked={
-														question.is_optional
-													}
-													onChange={(e) =>
-														updateQuestion(index, {
-															is_optional:
-																e.target
-																	.checked,
-														})
-													}
-													className="w-4 h-4"
-												/>
-												<Label
-													htmlFor={`optional-${index}`}
-													className="cursor-pointer font-normal"
-												>
-													This is an optional question
-													(attempt either/or)
-												</Label>
-											</div>
-										</div>
+											<td className="p-3">
+												<div className="flex items-center justify-center">
+													<input
+														type="checkbox"
+														id={`optional-${index}`}
+														checked={
+															question.is_optional
+														}
+														onChange={(e) =>
+															updateQuestion(
+																index,
+																{
+																	is_optional:
+																		e.target
+																			.checked,
+																}
+															)
+														}
+														className="w-4 h-4 cursor-pointer"
+													/>
+												</div>
+											</td>
 
-										{/* Delete Button */}
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											onClick={() =>
-												removeQuestion(index)
-											}
-											className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-										>
-											<Trash2 className="w-4 h-4" />
-										</Button>
-									</div>
-								</CardContent>
-							</Card>
-						))
+											{/* Delete Button */}
+											<td className="p-3">
+												<div className="flex justify-center">
+													<Button
+														type="button"
+														variant="ghost"
+														size="icon"
+														onClick={() =>
+															removeQuestion(
+																index
+															)
+														}
+														className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+													>
+														<Trash2 className="w-4 h-4" />
+													</Button>
+												</div>
+											</td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						</div>
 					)}
 				</CardContent>
 			</Card>

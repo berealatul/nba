@@ -125,13 +125,27 @@ export function MarksPage() {
 								) : (
 									<div className="flex flex-col items-center justify-center gap-6 py-12">
 										<div className="text-center">
-											<h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-												{selectedTest.name}
-											</h2>
-											<p className="text-gray-500 dark:text-gray-400">
-												Choose how you want to enter
-												marks
-											</p>
+											{selectedTest ? (
+												<>
+													<h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+														{selectedTest.name}
+													</h2>
+													<p className="text-gray-500 dark:text-gray-400">
+														Choose how you want to
+														enter marks
+													</p>
+												</>
+											) : (
+												<>
+													<h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+														Marks Management
+													</h2>
+													<p className="text-gray-500 dark:text-gray-400">
+														Choose an entry mode to
+														get started
+													</p>
+												</>
+											)}
 										</div>
 										<div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl">
 											<button
@@ -141,11 +155,11 @@ export function MarksPage() {
 												className="p-6 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-all group"
 											>
 												<h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400">
-													By Question
+													Bulk Marks Entry
 												</h3>
 												<p className="text-sm text-gray-500 dark:text-gray-400">
-													Enter marks for each
-													question individually
+													Enter marks for multiple
+													students in tabular format
 												</p>
 											</button>
 											<button
