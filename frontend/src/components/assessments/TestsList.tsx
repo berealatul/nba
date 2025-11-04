@@ -120,7 +120,7 @@ export function TestsList({ course, refreshTrigger }: TestsListProps) {
 							{Array.isArray(tests) &&
 								tests.map((test) => (
 									<TableRow key={test.id}>
-										<TableCell className="font-medium">
+										<TableCell className="text-left font-medium">
 											{test.name}
 										</TableCell>
 										<TableCell className="text-center">

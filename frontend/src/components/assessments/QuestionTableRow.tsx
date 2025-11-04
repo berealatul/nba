@@ -26,7 +26,7 @@ export function QuestionTableRow({
 	return (
 		<TableRow>
 			{/* Question Number */}
-			<TableCell>
+			<TableCell className="text-left">
 				<Input
 					type="number"
 					min="1"

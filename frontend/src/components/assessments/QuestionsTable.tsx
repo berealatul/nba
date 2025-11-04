@@ -33,9 +33,9 @@ export function QuestionsTable({
 				<TableHeader>
 					<TableRow>
 						<TableHead>Q.No</TableHead>
-						<TableHead>Sub-Q</TableHead>
-						<TableHead>CO</TableHead>
-						<TableHead>Max Marks</TableHead>
+						<TableHead className="text-center">Sub-Q</TableHead>
+						<TableHead className="text-center">CO</TableHead>
+						<TableHead className="text-center">Max Marks</TableHead>
 						<TableHead className="text-center">Optional</TableHead>
 						<TableHead className="text-center">Action</TableHead>
 					</TableRow>
