@@ -54,24 +54,143 @@ export function CreateAssessmentForm({
 	};
 
 	const addQuestion = () => {
+		const totalMarks = questions.reduce((sum, q) => sum + q.max_marks, 0);
+		const fullMarksNum = parseFloat(fullMarks);
+
+		if (fullMarksNum && totalMarks + 1 > fullMarksNum) {
+			toast.error(
+				`Cannot add question. Total marks (${totalMarks}) would exceed full marks (${fullMarksNum})`
+			);
+			return;
+		}
+
+		// Find the next available question number
+		const existingNumbers = questions.map((q) => q.question_number);
+		const maxNumber =
+			existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+
 		const newQuestion: Question = {
-			question_number: questions.length + 1,
+			question_number: maxNumber + 1,
 			sub_question: "",
 			is_optional: false,
 			co: 1,
-			max_marks: 10,
+			max_marks: 1,
 		};
 		setQuestions([...questions, newQuestion]);
 	};
 
+	const addSubQuestion = (questionNumber: number) => {
+		const totalMarks = questions.reduce((sum, q) => sum + q.max_marks, 0);
+		const fullMarksNum = parseFloat(fullMarks);
+
+		if (fullMarksNum && totalMarks + 1 > fullMarksNum) {
+			toast.error(
+				`Cannot add sub-question. Total marks (${totalMarks}) would exceed full marks (${fullMarksNum})`
+			);
+			return;
+		}
+
+		// Find all questions with the same question number
+		const sameNumberQuestions = questions.filter(
+			(q) => q.question_number === questionNumber
+		);
+
+		// Find the next available sub-question letter
+		let nextSubQuestion = "a";
+		if (sameNumberQuestions.length > 0) {
+			const existingSubQuestions = sameNumberQuestions
+				.map((q) => q.sub_question)
+				.filter((sq) => sq !== "");
+
+			if (existingSubQuestions.length === 0) {
+				// Convert the first question to sub-question 'a'
+				const questionIndex = questions.findIndex(
+					(q) => q.question_number === questionNumber
+				);
+				const updatedQuestions = [...questions];
+				updatedQuestions[questionIndex] = {
+					...updatedQuestions[questionIndex],
+					sub_question: "a",
+				};
+
+				// Add new sub-question 'b'
+				const newSubQuestion: Question = {
+					question_number: questionNumber,
+					sub_question: "b",
+					is_optional: false,
+					co: updatedQuestions[questionIndex].co,
+					max_marks: 1,
+				};
+
+				// Insert after the current question
+				updatedQuestions.splice(questionIndex + 1, 0, newSubQuestion);
+				setQuestions(updatedQuestions);
+			} else {
+				// Find the highest sub-question letter
+				const highestLetter = existingSubQuestions.sort().pop() || "a";
+				const nextCharCode = highestLetter.charCodeAt(0) + 1;
+
+				if (nextCharCode > "h".charCodeAt(0)) {
+					toast.error("Maximum 8 sub-questions (a-h) allowed");
+					return;
+				}
+
+				nextSubQuestion = String.fromCharCode(nextCharCode);
+
+				// Find the last occurrence of this question number
+				const lastIndex = questions
+					.map((q, i) => ({
+						q,
+						i,
+					}))
+					.filter((item) => item.q.question_number === questionNumber)
+					.pop()?.i;
+
+				if (lastIndex !== undefined) {
+					const newSubQuestion: Question = {
+						question_number: questionNumber,
+						sub_question: nextSubQuestion,
+						is_optional: false,
+						co: questions[lastIndex].co,
+						max_marks: 1,
+					};
+
+					const updatedQuestions = [...questions];
+					updatedQuestions.splice(lastIndex + 1, 0, newSubQuestion);
+					setQuestions(updatedQuestions);
+				}
+			}
+		}
+	};
+
 	const removeQuestion = (index: number) => {
+		const questionToRemove = questions[index];
 		const newQuestions = questions.filter((_, i) => i !== index);
-		// Renumber remaining questions
-		const renumbered = newQuestions.map((q, i) => ({
-			...q,
-			question_number: i + 1,
-		}));
-		setQuestions(renumbered);
+
+		// Check if this was the only question with this number and had a sub-question
+		const sameNumberQuestions = newQuestions.filter(
+			(q) => q.question_number === questionToRemove.question_number
+		);
+
+		// If only one question remains with this number and it has a sub-question, clear the sub-question
+		if (
+			sameNumberQuestions.length === 1 &&
+			sameNumberQuestions[0].sub_question !== ""
+		) {
+			const questionIndex = newQuestions.findIndex(
+				(q) =>
+					q.question_number === questionToRemove.question_number &&
+					q.sub_question !== ""
+			);
+			if (questionIndex !== -1) {
+				newQuestions[questionIndex] = {
+					...newQuestions[questionIndex],
+					sub_question: "",
+				};
+			}
+		}
+
+		setQuestions(newQuestions);
 	};
 
 	const updateQuestion = (index: number, updates: Partial<Question>) => {
@@ -96,6 +215,17 @@ export function CreateAssessmentForm({
 
 		if (questions.length === 0) {
 			toast.error("Please add at least one question");
+			return;
+		}
+
+		// Calculate total marks
+		const totalMarks = questions.reduce((sum, q) => sum + q.max_marks, 0);
+		const fullMarksNum = parseFloat(fullMarks);
+
+		if (totalMarks !== fullMarksNum) {
+			toast.error(
+				`Total marks (${totalMarks}) must equal full marks (${fullMarksNum})`
+			);
 			return;
 		}
 
@@ -176,12 +306,43 @@ export function CreateAssessmentForm({
 				{/* Questions Section */}
 				<Card>
 					<CardHeader className="flex flex-row items-center justify-between">
-						<CardTitle>Questions</CardTitle>
+						<div className="flex items-center gap-4">
+							<CardTitle>Questions</CardTitle>
+							{fullMarks && (
+								<div className="text-sm text-gray-600 dark:text-gray-400">
+									Total Marks:{" "}
+									<span
+										className={
+											questions.reduce(
+												(sum, q) => sum + q.max_marks,
+												0
+											) > parseFloat(fullMarks)
+												? "text-red-600 font-semibold"
+												: "text-green-600 font-semibold"
+										}
+									>
+										{questions.reduce(
+											(sum, q) => sum + q.max_marks,
+											0
+										)}
+									</span>{" "}
+									/ {fullMarks}
+								</div>
+							)}
+						</div>
 						<Button
 							type="button"
 							onClick={addQuestion}
 							size="sm"
 							className="gap-2"
+							disabled={
+								fullMarks
+									? questions.reduce(
+											(sum, q) => sum + q.max_marks,
+											0
+									  ) >= parseFloat(fullMarks)
+									: false
+							}
 						>
 							<Plus className="w-4 h-4" />
 							Add Question
@@ -192,6 +353,7 @@ export function CreateAssessmentForm({
 							questions={questions}
 							onUpdateQuestion={updateQuestion}
 							onRemoveQuestion={removeQuestion}
+							onAddSubQuestion={addSubQuestion}
 						/>
 					</CardContent>
 				</Card>

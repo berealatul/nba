@@ -12,12 +12,14 @@ interface QuestionsTableProps {
 	questions: Question[];
 	onUpdateQuestion: (index: number, updates: Partial<Question>) => void;
 	onRemoveQuestion: (index: number) => void;
+	onAddSubQuestion: (questionNumber: number) => void;
 }
 
 export function QuestionsTable({
 	questions,
 	onUpdateQuestion,
 	onRemoveQuestion,
+	onAddSubQuestion,
 }: QuestionsTableProps) {
 	if (questions.length === 0) {
 		return (
@@ -37,7 +39,7 @@ export function QuestionsTable({
 						<TableHead className="text-center">CO</TableHead>
 						<TableHead className="text-center">Max Marks</TableHead>
 						<TableHead className="text-center">Optional</TableHead>
-						<TableHead className="text-center">Action</TableHead>
+						<TableHead className="text-center">Actions</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>
@@ -48,6 +50,7 @@ export function QuestionsTable({
 							index={index}
 							onUpdate={onUpdateQuestion}
 							onRemove={onRemoveQuestion}
+							onAddSubQuestion={onAddSubQuestion}
 						/>
 					))}
 				</TableBody>

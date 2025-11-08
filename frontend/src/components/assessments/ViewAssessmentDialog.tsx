@@ -6,9 +6,8 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { X, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import { CourseInfoCard } from "./CourseInfoCard";
 import { AssessmentInfoCard } from "./AssessmentInfoCard";
 import { QuestionsBreakdownTable } from "./QuestionsBreakdownTable";
@@ -56,26 +55,11 @@ export function ViewAssessmentDialog({
 		}
 	};
 
-	const handleClose = () => {
-		onOpenChange(false);
-		setDetails(null);
-	};
-
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="max-w-4xl max-h-[90vh]">
 				<DialogHeader>
-					<DialogTitle className="flex items-center justify-between">
-						<span>Assessment Details</span>
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={handleClose}
-							className="h-6 w-6"
-						>
-							<X className="h-4 w-4" />
-						</Button>
-					</DialogTitle>
+					<DialogTitle>Assessment Details</DialogTitle>
 					<DialogDescription>
 						View complete assessment information and question
 						breakdown

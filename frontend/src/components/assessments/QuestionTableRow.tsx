@@ -7,7 +7,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Trash2 } from "lucide-react";
+import { ChevronDown, Trash2, Plus } from "lucide-react";
 import type { Question } from "@/services/api";
 
 interface QuestionTableRowProps {
@@ -15,6 +15,7 @@ interface QuestionTableRowProps {
 	index: number;
 	onUpdate: (index: number, updates: Partial<Question>) => void;
 	onRemove: (index: number) => void;
+	onAddSubQuestion: (questionNumber: number) => void;
 }
 
 export function QuestionTableRow({
@@ -22,6 +23,7 @@ export function QuestionTableRow({
 	index,
 	onUpdate,
 	onRemove,
+	onAddSubQuestion,
 }: QuestionTableRowProps) {
 	return (
 		<TableRow>
@@ -96,7 +98,7 @@ export function QuestionTableRow({
 					value={question.max_marks}
 					onChange={(e) =>
 						onUpdate(index, {
-							max_marks: parseFloat(e.target.value) || 0.5,
+							max_marks: parseFloat(e.target.value) || 1,
 						})
 					}
 					className="w-24"
@@ -119,17 +121,33 @@ export function QuestionTableRow({
 				/>
 			</TableCell>
 
-			{/* Delete Button */}
+			{/* Action Buttons */}
 			<TableCell className="text-center">
-				<Button
-					type="button"
-					variant="ghost"
-					size="icon"
-					onClick={() => onRemove(index)}
-					className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-				>
-					<Trash2 className="w-4 h-4" />
-				</Button>
+				<div className="flex items-center justify-center gap-2">
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={() =>
+							onAddSubQuestion(question.question_number)
+						}
+						className="gap-1"
+						title="Add Sub-Question"
+					>
+						<Plus className="w-3 h-3" />
+						Sub-Q
+					</Button>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon"
+						onClick={() => onRemove(index)}
+						className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+						title="Delete Question"
+					>
+						<Trash2 className="w-4 h-4" />
+					</Button>
+				</div>
 			</TableCell>
 		</TableRow>
 	);
