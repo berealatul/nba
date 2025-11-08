@@ -85,6 +85,12 @@ export function COPOPage() {
 							courseCode={selectedCourse.course_code}
 							courseName={selectedCourse.name}
 							courseId={selectedCourse.id}
+							facultyName={user.username}
+							departmentName={
+								user.department_name || "Not Assigned"
+							}
+							year={selectedCourse.year}
+							semester={selectedCourse.semester}
 						/>
 					) : (
 						<div className="flex items-center justify-center h-full">

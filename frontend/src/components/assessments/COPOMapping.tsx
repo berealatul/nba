@@ -16,6 +16,10 @@ interface COPOMappingProps {
 	courseCode: string;
 	courseName: string;
 	courseId: number;
+	facultyName: string;
+	departmentName: string;
+	year: number;
+	semester: number;
 }
 
 // Student marks interface for display
@@ -40,6 +44,10 @@ export function COPOMapping({
 	courseCode,
 	courseName,
 	courseId,
+	facultyName,
+	departmentName,
+	year,
+	semester,
 }: COPOMappingProps) {
 	const [loading, setLoading] = useState(true);
 	const [studentsData, setStudentsData] = useState<StudentMarks[]>([]);
@@ -268,15 +276,78 @@ export function COPOMapping({
 		percentage: 60,
 	};
 
-	// Faculty and course details
-	const facultyDetails = {
-		name: "Dr S. S. Satapathy",
-		branch: "Mechanical Engineering",
-		programme: "B. Tech",
-		year: "I",
-		semester: "II",
-		session: "2021-22",
+	// Calculate academic year from year and semester
+	const getAcademicYear = (year: number): string => {
+		// Convert year (1-4) to academic year display
+		const yearMap: { [key: number]: string } = {
+			1: "I",
+			2: "II",
+			3: "III",
+			4: "IV",
+		};
+		return yearMap[year] || "I";
 	};
+
+	const getSemesterDisplay = (sem: number): string => {
+		// Convert semester (1-8) to display format
+		const semMap: { [key: number]: string } = {
+			1: "I",
+			2: "II",
+			3: "III",
+			4: "IV",
+			5: "V",
+			6: "VI",
+			7: "VII",
+			8: "VIII",
+		};
+		return semMap[sem] || "I";
+	};
+
+	// Get current academic session (e.g., "2024-25")
+	const getCurrentSession = (): string => {
+		const currentYear = new Date().getFullYear();
+		return `${currentYear}-${String(currentYear + 1).slice(-2)}`;
+	};
+
+	// Calculate CO Attainment Statistics
+	const calculateCOAttainment = () => {
+		const totalStudents = studentsData.length;
+		const absentees = studentsData.filter(
+			(s) => s.absentee === "AB" || s.absentee === "UR"
+		).length;
+		const presentStudents = totalStudents - absentees;
+
+		const coStats = {
+			CO1: { above70: 0, above60: 0, above50: 0, abovePass: 0 },
+			CO2: { above70: 0, above60: 0, above50: 0, abovePass: 0 },
+			CO3: { above70: 0, above60: 0, above50: 0, abovePass: 0 },
+			CO4: { above70: 0, above60: 0, above50: 0, abovePass: 0 },
+			CO5: { above70: 0, above60: 0, above50: 0, abovePass: 0 },
+			CO6: { above70: 0, above60: 0, above50: 0, abovePass: 0 },
+		};
+
+		studentsData.forEach((student) => {
+			if (student.absentee === "AB" || student.absentee === "UR") return;
+
+			Object.keys(coStats).forEach((co) => {
+				const percentage =
+					student.coTotals[co as keyof typeof student.coTotals];
+				if (percentage >= 70)
+					coStats[co as keyof typeof coStats].above70++;
+				if (percentage >= 60)
+					coStats[co as keyof typeof coStats].above60++;
+				if (percentage >= 50)
+					coStats[co as keyof typeof coStats].above50++;
+				if (percentage >= passingMarks.threshold)
+					coStats[co as keyof typeof coStats].abovePass++;
+			});
+		});
+
+		return { totalStudents, absentees, presentStudents, coStats };
+	};
+
+	const attainmentData =
+		studentsData.length > 0 ? calculateCOAttainment() : null;
 
 	const getLevelColor = (level: number): string => {
 		switch (level) {
@@ -408,23 +479,23 @@ export function COPOMapping({
 								<span className="font-semibold">
 									Faculty Name:
 								</span>
-								<span>{facultyDetails.name}</span>
+								<span>{facultyName}</span>
 							</div>
 							<div className="flex gap-2">
 								<span className="font-semibold">BRANCH:</span>
-								<span>{facultyDetails.branch}</span>
+								<span>{departmentName}</span>
 							</div>
 							<div className="flex gap-2">
 								<span className="font-semibold">
 									Programme:
 								</span>
-								<span>{facultyDetails.programme}</span>
+								<span>B. Tech</span>
 							</div>
 							<div className="flex gap-2">
 								<span className="font-semibold">YEAR:</span>
-								<span>{facultyDetails.year}</span>
+								<span>{getAcademicYear(year)}</span>
 								<span className="font-semibold ml-4">SEM:</span>
-								<span>{facultyDetails.semester}</span>
+								<span>{getSemesterDisplay(semester)}</span>
 							</div>
 						</div>
 						<div className="grid grid-cols-2 gap-2 text-sm">
@@ -440,7 +511,7 @@ export function COPOMapping({
 								<span className="font-semibold ml-4">
 									SESSION:
 								</span>
-								<span>{facultyDetails.session}</span>
+								<span>{getCurrentSession()}</span>
 							</div>
 						</div>
 					</div>
@@ -751,6 +822,469 @@ export function COPOMapping({
 					</div>
 				</CardContent>
 			</Card>
+
+			{/* CO Attainment Tables */}
+			{attainmentData && (
+				<>
+					{/* CO ATTAINMENT in 3.0 POINT Scale */}
+					<Card>
+						<CardHeader className="bg-pink-100 dark:bg-pink-950">
+							<CardTitle className="text-xl text-center font-bold">
+								CO ATTAINMENT in 3.0 POINT Scale
+							</CardTitle>
+						</CardHeader>
+						<CardContent className="p-0">
+							<div className="overflow-x-auto">
+								<Table>
+									<TableHeader>
+										<TableRow className="bg-blue-100 dark:bg-blue-950">
+											<TableHead
+												className="border border-gray-300 dark:border-gray-700 font-bold text-center align-middle bg-yellow-200 dark:bg-yellow-900"
+												rowSpan={2}
+											>
+												ATTAINMENT TABLE
+											</TableHead>
+											<TableHead
+												className="border border-gray-300 dark:border-gray-700 font-bold text-center"
+												colSpan={6}
+											>
+												CO1 to CO6
+											</TableHead>
+										</TableRow>
+										<TableRow className="bg-gray-100 dark:bg-gray-900">
+											{[
+												"CO1",
+												"CO2",
+												"CO3",
+												"CO4",
+												"CO5",
+												"CO6",
+											].map((co) => (
+												<TableHead
+													key={co}
+													className="border border-gray-300 dark:border-gray-700 font-bold text-center"
+												>
+													{co}
+												</TableHead>
+											))}
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										<TableRow>
+											<TableCell className="border border-gray-300 dark:border-gray-700 font-medium">
+												ABSENTEE+NOT ATTEMPT
+											</TableCell>
+											{[
+												"CO1",
+												"CO2",
+												"CO3",
+												"CO4",
+												"CO5",
+												"CO6",
+											].map((co) => (
+												<TableCell
+													key={co}
+													className="border border-gray-300 dark:border-gray-700 text-center"
+												>
+													{attainmentData.absentees}
+												</TableCell>
+											))}
+										</TableRow>
+										<TableRow>
+											<TableCell className="border border-gray-300 dark:border-gray-700 font-medium">
+												PRESENT STUDENT OR ATTEMPT
+											</TableCell>
+											{[
+												"CO1",
+												"CO2",
+												"CO3",
+												"CO4",
+												"CO5",
+												"CO6",
+											].map((co) => (
+												<TableCell
+													key={co}
+													className="border border-gray-300 dark:border-gray-700 text-center"
+												>
+													{
+														attainmentData.presentStudents
+													}
+												</TableCell>
+											))}
+										</TableRow>
+										<TableRow>
+											<TableCell className="border border-gray-300 dark:border-gray-700 font-medium">
+												NO. OF STUDENTS SECURE MARKS
+												&gt; THRESHOLD % FOR CO
+												ATTAINMENT
+											</TableCell>
+											{[
+												"CO1",
+												"CO2",
+												"CO3",
+												"CO4",
+												"CO5",
+												"CO6",
+											].map((co) => (
+												<TableCell
+													key={co}
+													className="border border-gray-300 dark:border-gray-700 text-center bg-gray-900 dark:bg-gray-950 text-white"
+												>
+													{
+														attainmentData.coStats[
+															co as keyof typeof attainmentData.coStats
+														].above70
+													}
+												</TableCell>
+											))}
+										</TableRow>
+										<TableRow>
+											<TableCell className="border border-gray-300 dark:border-gray-700 font-medium">
+												PC. OF STUDENTS SECURE MARKS
+												&gt; THRESHOLD % FOR CO
+												ATTAINMENT
+											</TableCell>
+											{[
+												"CO1",
+												"CO2",
+												"CO3",
+												"CO4",
+												"CO5",
+												"CO6",
+											].map((co) => {
+												const percentage =
+													attainmentData.presentStudents >
+													0
+														? (attainmentData
+																.coStats[
+																co as keyof typeof attainmentData.coStats
+														  ].above70 /
+																attainmentData.presentStudents) *
+														  100
+														: 0;
+												return (
+													<TableCell
+														key={co}
+														className="border border-gray-300 dark:border-gray-700 text-center"
+													>
+														{percentage.toFixed(2)}
+													</TableCell>
+												);
+											})}
+										</TableRow>
+										<TableRow>
+											<TableCell className="border border-gray-300 dark:border-gray-700 font-medium">
+												CO Attainment (3 ≥ 70%, 2 ≥60%,
+												1 ≥ 50%)
+											</TableCell>
+											{[
+												"CO1",
+												"CO2",
+												"CO3",
+												"CO4",
+												"CO5",
+												"CO6",
+											].map((co) => {
+												const percentage =
+													attainmentData.presentStudents >
+													0
+														? (attainmentData
+																.coStats[
+																co as keyof typeof attainmentData.coStats
+														  ].above70 /
+																attainmentData.presentStudents) *
+														  100
+														: 0;
+												const level =
+													percentage >= 70
+														? 3
+														: percentage >= 60
+														? 2
+														: percentage >= 50
+														? 1
+														: 0;
+												return (
+													<TableCell
+														key={co}
+														className={`border border-gray-300 dark:border-gray-700 text-center font-bold ${getPercentageColor(
+															percentage
+														)}`}
+													>
+														{level.toFixed(2)}
+													</TableCell>
+												);
+											})}
+										</TableRow>
+										<TableRow className="bg-orange-100 dark:bg-orange-950">
+											<TableCell className="border border-gray-300 dark:border-gray-700 font-bold">
+												Final attainment level CO (by
+												Direct Assessment):
+											</TableCell>
+											{[
+												"CO1",
+												"CO2",
+												"CO3",
+												"CO4",
+												"CO5",
+												"CO6",
+											].map((co) => {
+												const percentage =
+													attainmentData.presentStudents >
+													0
+														? (attainmentData
+																.coStats[
+																co as keyof typeof attainmentData.coStats
+														  ].above70 /
+																attainmentData.presentStudents) *
+														  100
+														: 0;
+												const level =
+													percentage >= 70
+														? 3
+														: percentage >= 60
+														? 2
+														: percentage >= 50
+														? 1
+														: 0;
+												return (
+													<TableCell
+														key={co}
+														className={`border border-gray-300 dark:border-gray-700 text-center font-bold ${getPercentageColor(
+															percentage
+														)}`}
+													>
+														{level.toFixed(2)}
+													</TableCell>
+												);
+											})}
+										</TableRow>
+									</TableBody>
+								</Table>
+							</div>
+						</CardContent>
+					</Card>
+
+					{/* CO ATTAINMENT in ABSOLUTE Scale */}
+					<Card>
+						<CardHeader className="bg-pink-100 dark:bg-pink-950">
+							<CardTitle className="text-xl text-center font-bold">
+								CO ATTAINMENT in ABSOLUTE Scale
+							</CardTitle>
+						</CardHeader>
+						<CardContent className="p-0">
+							<div className="overflow-x-auto">
+								<Table>
+									<TableHeader>
+										<TableRow className="bg-blue-100 dark:bg-blue-950">
+											<TableHead
+												className="border border-gray-300 dark:border-gray-700 font-bold text-center align-middle bg-yellow-200 dark:bg-yellow-900"
+												rowSpan={2}
+											>
+												ATTAINMENT TABLE
+											</TableHead>
+											<TableHead
+												className="border border-gray-300 dark:border-gray-700 font-bold text-center"
+												colSpan={6}
+											>
+												CO1 to CO6
+											</TableHead>
+										</TableRow>
+										<TableRow className="bg-gray-100 dark:bg-gray-900">
+											{[
+												"CO1",
+												"CO2",
+												"CO3",
+												"CO4",
+												"CO5",
+												"CO6",
+											].map((co) => (
+												<TableHead
+													key={co}
+													className="border border-gray-300 dark:border-gray-700 font-bold text-center"
+												>
+													{co}
+												</TableHead>
+											))}
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										<TableRow>
+											<TableCell className="border border-gray-300 dark:border-gray-700 font-medium">
+												ABSENTEE+NOT ATTEMPT
+											</TableCell>
+											{[
+												"CO1",
+												"CO2",
+												"CO3",
+												"CO4",
+												"CO5",
+												"CO6",
+											].map((co) => (
+												<TableCell
+													key={co}
+													className="border border-gray-300 dark:border-gray-700 text-center"
+												>
+													{attainmentData.absentees}
+												</TableCell>
+											))}
+										</TableRow>
+										<TableRow>
+											<TableCell className="border border-gray-300 dark:border-gray-700 font-medium">
+												PRESENT STUDENT OR ATTEMPT
+											</TableCell>
+											{[
+												"CO1",
+												"CO2",
+												"CO3",
+												"CO4",
+												"CO5",
+												"CO6",
+											].map((co) => (
+												<TableCell
+													key={co}
+													className="border border-gray-300 dark:border-gray-700 text-center"
+												>
+													{
+														attainmentData.presentStudents
+													}
+												</TableCell>
+											))}
+										</TableRow>
+										<TableRow>
+											<TableCell className="border border-gray-300 dark:border-gray-700 font-medium">
+												NO. OF STUDENTS SECURE MARKS
+												&gt; PASSING MARKS
+											</TableCell>
+											{[
+												"CO1",
+												"CO2",
+												"CO3",
+												"CO4",
+												"CO5",
+												"CO6",
+											].map((co) => (
+												<TableCell
+													key={co}
+													className="border border-gray-300 dark:border-gray-700 text-center bg-gray-800 dark:bg-gray-950 text-white"
+												>
+													{
+														attainmentData.coStats[
+															co as keyof typeof attainmentData.coStats
+														].abovePass
+													}
+												</TableCell>
+											))}
+										</TableRow>
+										<TableRow>
+											<TableCell className="border border-gray-300 dark:border-gray-700 font-medium">
+												PC. OF STUDENTS SECURE MARKS
+												&gt; PASSING MARKS
+											</TableCell>
+											{[
+												"CO1",
+												"CO2",
+												"CO3",
+												"CO4",
+												"CO5",
+												"CO6",
+											].map((co) => {
+												const percentage =
+													attainmentData.presentStudents >
+													0
+														? (attainmentData
+																.coStats[
+																co as keyof typeof attainmentData.coStats
+														  ].abovePass /
+																attainmentData.presentStudents) *
+														  100
+														: 0;
+												return (
+													<TableCell
+														key={co}
+														className="border border-gray-300 dark:border-gray-700 text-center"
+													>
+														{percentage.toFixed(2)}
+													</TableCell>
+												);
+											})}
+										</TableRow>
+										<TableRow>
+											<TableCell className="border border-gray-300 dark:border-gray-700 font-medium">
+												CO Attainment (AVERAGE OF
+												PERCENTAGE ATTAINMENTS)
+											</TableCell>
+											{[
+												"CO1",
+												"CO2",
+												"CO3",
+												"CO4",
+												"CO5",
+												"CO6",
+											].map((co) => {
+												const percentage =
+													attainmentData.presentStudents >
+													0
+														? (attainmentData
+																.coStats[
+																co as keyof typeof attainmentData.coStats
+														  ].abovePass /
+																attainmentData.presentStudents) *
+														  100
+														: 0;
+												return (
+													<TableCell
+														key={co}
+														className={`border border-gray-300 dark:border-gray-700 text-center font-bold ${getPercentageColor(
+															percentage
+														)}`}
+													>
+														{percentage.toFixed(2)}
+													</TableCell>
+												);
+											})}
+										</TableRow>
+										<TableRow className="bg-orange-100 dark:bg-orange-950">
+											<TableCell className="border border-gray-300 dark:border-gray-700 font-bold">
+												Final attainment level CO (IN
+												ABSOLUTE SCALE):
+											</TableCell>
+											{[
+												"CO1",
+												"CO2",
+												"CO3",
+												"CO4",
+												"CO5",
+												"CO6",
+											].map((co) => {
+												const percentage =
+													attainmentData.presentStudents >
+													0
+														? (attainmentData
+																.coStats[
+																co as keyof typeof attainmentData.coStats
+														  ].abovePass /
+																attainmentData.presentStudents) *
+														  100
+														: 0;
+												return (
+													<TableCell
+														key={co}
+														className={`border border-gray-300 dark:border-gray-700 text-center font-bold ${getPercentageColor(
+															percentage
+														)}`}
+													>
+														{percentage.toFixed(2)}
+													</TableCell>
+												);
+											})}
+										</TableRow>
+									</TableBody>
+								</Table>
+							</div>
+						</CardContent>
+					</Card>
+				</>
+			)}
 
 			{/* CO-PO Mapping Table */}
 			<Card>
