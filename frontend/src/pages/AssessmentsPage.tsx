@@ -48,9 +48,11 @@ export function AssessmentsPage() {
 		navigate("/login");
 	};
 
-	const handleNavigate = (page: "assessments" | "marks") => {
+	const handleNavigate = (page: "assessments" | "marks" | "copo") => {
 		if (page === "marks") {
 			navigate("/marks");
+		} else if (page === "copo") {
+			navigate("/copo");
 		}
 	};
 

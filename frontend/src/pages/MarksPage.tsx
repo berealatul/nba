@@ -50,9 +50,11 @@ export function MarksPage() {
 		navigate("/login");
 	};
 
-	const handleNavigate = (page: "assessments" | "marks") => {
+	const handleNavigate = (page: "assessments" | "marks" | "copo") => {
 		if (page === "assessments") {
 			navigate("/assessments");
+		} else if (page === "copo") {
+			navigate("/copo");
 		}
 	};
 

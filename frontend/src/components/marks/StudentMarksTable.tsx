@@ -17,10 +17,18 @@ import {
 	PaginationPrevious,
 } from "@/components/ui/pagination";
 import { FileText } from "lucide-react";
-import type { MarksRecord } from "@/services/api";
 
 interface StudentMarksTableProps {
-	marks: Array<MarksRecord & { student_name: string }>;
+	marks: Array<{
+		student_id: string;
+		student_name: string;
+		CO1: string | number;
+		CO2: string | number;
+		CO3: string | number;
+		CO4: string | number;
+		CO5: string | number;
+		CO6: string | number;
+	}>;
 	passMarks: number;
 	loading: boolean;
 }
@@ -33,14 +41,23 @@ export function StudentMarksTable({
 	const [currentPage, setCurrentPage] = useState(1);
 	const itemsPerPage = 10;
 
-	const calculateTotal = (mark: MarksRecord) => {
+	const calculateTotal = (markData: {
+		student_id: string;
+		student_name: string;
+		CO1: string | number;
+		CO2: string | number;
+		CO3: string | number;
+		CO4: string | number;
+		CO5: string | number;
+		CO6: string | number;
+	}) => {
 		return (
-			Number(mark.CO1) +
-			Number(mark.CO2) +
-			Number(mark.CO3) +
-			Number(mark.CO4) +
-			Number(mark.CO5) +
-			Number(mark.CO6)
+			Number(markData.CO1) +
+			Number(markData.CO2) +
+			Number(markData.CO3) +
+			Number(markData.CO4) +
+			Number(markData.CO5) +
+			Number(markData.CO6)
 		);
 	};
 
@@ -98,7 +115,7 @@ export function StudentMarksTable({
 							const total = calculateTotal(mark);
 							const passed = total >= passMarks;
 							return (
-								<TableRow key={mark.id}>
+								<TableRow key={mark.student_id}>
 									<TableCell className="text-left font-medium">
 										{mark.student_id}
 									</TableCell>

@@ -485,7 +485,17 @@ class ApiService {
 
 	async getTestMarks(testId: number): Promise<{
 		test: Test;
-		marks: Array<MarksRecord & { student_name: string }>;
+		course: Course;
+		marks: Array<{
+			student_id: string;
+			student_name: string;
+			CO1: string | number;
+			CO2: string | number;
+			CO3: string | number;
+			CO4: string | number;
+			CO5: string | number;
+			CO6: string | number;
+		}>;
 	}> {
 		const response = await fetch(
 			`${API_BASE_URL}/marks/test?test_id=${testId}`,

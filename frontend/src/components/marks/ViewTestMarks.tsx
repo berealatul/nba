@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiService } from "@/services/api";
-import type { Course, Test, MarksRecord } from "@/services/api";
+import type { Course, Test } from "@/services/api";
 import { TestHeader } from "./TestHeader";
 import { StudentMarksTable } from "./StudentMarksTable";
 
@@ -13,7 +13,16 @@ interface ViewTestMarksProps {
 
 export function ViewTestMarks({ test, course, onBack }: ViewTestMarksProps) {
 	const [marks, setMarks] = useState<
-		Array<MarksRecord & { student_name: string }>
+		Array<{
+			student_id: string;
+			student_name: string;
+			CO1: string | number;
+			CO2: string | number;
+			CO3: string | number;
+			CO4: string | number;
+			CO5: string | number;
+			CO6: string | number;
+		}>
 	>([]);
 	const [loading, setLoading] = useState(false);
 

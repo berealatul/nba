@@ -1,15 +1,15 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ClipboardList, LogOut, FileCheck } from "lucide-react";
+import { ClipboardList, LogOut, FileCheck, Network } from "lucide-react";
 import type { User } from "@/services/api";
 
 interface AssessmentsSidebarProps {
 	user: User;
 	sidebarOpen: boolean;
 	onLogout: () => void;
-	currentPage?: "assessments" | "marks";
-	onNavigate?: (page: "assessments" | "marks") => void;
+	currentPage?: "assessments" | "marks" | "copo";
+	onNavigate?: (page: "assessments" | "marks" | "copo") => void;
 }
 
 export function AssessmentsSidebar({
@@ -67,6 +67,17 @@ export function AssessmentsSidebar({
 						>
 							<FileCheck className="w-5 h-5" />
 							<span>Marks Entry</span>
+						</button>
+						<button
+							onClick={() => onNavigate?.("copo")}
+							className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+								currentPage === "copo"
+									? "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
+									: "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+							}`}
+						>
+							<Network className="w-5 h-5" />
+							<span>CO-PO Mapping</span>
 						</button>
 					</nav>
 
