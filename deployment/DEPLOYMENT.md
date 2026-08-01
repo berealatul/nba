@@ -12,7 +12,7 @@ This guide explains how to host the PHP backend and MySQL database on an AWS EC2
 
 1.  Go to the **AWS Console** > **EC2**.
 2.  Click **Launch Instance**.
-3.  **Name**: `NBA-Server`.
+3.  **Name**: `OBEMS-Server`.
 4.  **OS Image**: Choose **Ubuntu Server 22.04 LTS** (Free Tier eligible).
 5.  **Instance Type**: `t2.micro` (Free Tier eligible) or larger.
 6.  **Key Pair**: Create new or select existing (Download the `.pem` file).

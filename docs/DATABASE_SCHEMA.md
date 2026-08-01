@@ -1,4 +1,4 @@
-# NBA Assessment System - Database Schema v10.0
+# OBEMS - Database Schema v10.0
 
 ## ERD Diagram
 

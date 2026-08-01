@@ -1,4 +1,4 @@
-# NBA System - Component Architecture
+# OBEMS - Component Architecture
 
 ## Application Architecture
 

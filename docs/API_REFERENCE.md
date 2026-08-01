@@ -1,4 +1,4 @@
-# NBA API Reference
+# OBEMS API Reference
 
 **Base URL:** `http://localhost/nba/api/`  
 **Authentication:** All endpoints (except login) require: `Authorization: Bearer <jwt_token>`

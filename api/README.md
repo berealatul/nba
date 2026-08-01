@@ -1,6 +1,6 @@
-﻿# NBA Assessment API
+﻿# OBEMS API
 
-Restful API for the NBA Outcome Based Education (OBE) Management System.
+Restful API for the OBEMS platform.
 
 **Base URL**: https://api.nba.wily.in (Production) | http://localhost/nba/api (Dev)  
 **Auth**: Bearer Token (JWT) required for all non-auth endpoints.

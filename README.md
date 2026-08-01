@@ -1,4 +1,4 @@
-# NBA Assessment System (OBE)
+# OBEMS - Outcome Based Education Management System
 
 A comprehensive **Outcome Based Education (OBE)** management system tailored for verifying National Board of Accreditation (NBA) compliance. This robust platform streamlines the calculation of **Course Attainment**, **CO-PO/PSO Mapping**, **Student Performance Assessment**, and institutional auditing.
 
@@ -63,7 +63,7 @@ npm run dev      # Start dev server (typically on port 5173)
 For detailed architectural and API information, please refer to:
 - `docs/API_REFERENCE.md` - Complete REST API specification
 - `frontend/COMPONENT_ARCHITECTURE.md` - Frontend component tree and routing map
-- `docs/NBA Assessment API.postman_collection.json` - Postman collection for API testing
+- `docs/OBEMS API.postman_collection.json` - Postman collection for API testing
 
 ## Live Demo
 - **Frontend**: [https://nba.wily.in](https://nba.wily.in)
