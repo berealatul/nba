@@ -1,6 +1,6 @@
-# Deployment Guide: AWS EC2 (LEMP Stack)
+# Legacy Deployment Guide: AWS EC2 (LEMP Stack)
 
-This guide explains how to host the PHP backend and MySQL database on an AWS EC2 instance using SSH with Nginx.
+This legacy guide explains how the PHP backend and MySQL database can be hosted on an AWS EC2 instance using SSH with Nginx. OBEMS is currently deployed on the university's internal server and is not publicly hosted through AWS.
 
 ## Prerequisites
 

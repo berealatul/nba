@@ -27,7 +27,7 @@ A comprehensive **Outcome Based Education (OBE)** management system tailored for
 - **Routing**: React Router (Role-protected nested layouts)
 
 ### Deployment
-- **Hosting**: AWS EC2 (Ubuntu/Nginx)
+- **Current Hosting**: University internal server; not publicly accessible
 - **Local Dev**: XAMPP (Apache + MySQL), Node.js (Vite Dev Server)
 
 ## Project Structure
@@ -65,9 +65,9 @@ For detailed architectural and API information, please refer to:
 - `frontend/COMPONENT_ARCHITECTURE.md` - Frontend component tree and routing map
 - `docs/OBEMS API.postman_collection.json` - Postman collection for API testing
 
-## Live Demo
-- **Frontend**: [https://nba.wily.in](https://nba.wily.in)
-- **API**: [https://api.nba.wily.in](https://api.nba.wily.in)
+## Access
+- The production deployment currently runs on the university's internal server and is not publicly hosted.
+- Public demo URLs are not available at this time.
 
 ---
 *Developed for CSE Department, Tezpur University.*

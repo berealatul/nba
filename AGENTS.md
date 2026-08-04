@@ -46,4 +46,4 @@ Frontend runs on Vite (typically port 5173), proxy configured in `vite.config.ts
 
 ## No CI/CD
 
-This repo has no GitHub Actions workflows or automated pipelines. Deployment is manual to AWS EC2.
+This repo has no GitHub Actions workflows or automated pipelines. Current deployment is manual to the university's internal server.
