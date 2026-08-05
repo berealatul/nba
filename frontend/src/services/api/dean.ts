@@ -1,4 +1,5 @@
-import { apiGet, apiPost, apiDelete, apiGetPaginated } from "./base";
+import { apiGet, apiPost, apiPut, apiDelete, apiGetPaginated } from "./base";
+import { debugLogger } from "@/lib/debugLogger";
 import type {
 	DeanStats,
 	DeanDepartment,
@@ -11,11 +12,15 @@ import type {
 	HODHistoryRecord,
 	PaginatedResponse,
 	PaginationParams,
+	Department,
+	CreateDepartmentRequest,
+	UpdateDepartmentRequest,
 } from "./types";
 
 export const deanApi = {
-	async getStats(): Promise<DeanStats> {
-		return apiGet<DeanStats>("/dean/stats");
+	async getStats(options?: { bypassCache?: boolean }): Promise<DeanStats> {
+		debugLogger.info("deanApi", "getStats called");
+		return apiGet<DeanStats>("/dean/stats", options);
 	},
 
 	async getAllDepartments(
@@ -49,11 +54,13 @@ export const deanApi = {
 	},
 
 	async getDepartmentAnalytics(): Promise<DepartmentAnalytics[]> {
+		debugLogger.info("deanApi", "getAllDepartments called");
 		return apiGet<DepartmentAnalytics[]>("/dean/analytics");
 	},
 
 	// HOD Management
 	async getDepartmentFaculty(departmentId: number): Promise<DeanUser[]> {
+		debugLogger.info("deanApi", "getDepartmentFaculty called");
 		return apiGet<DeanUser[]>(`/dean/departments/${departmentId}/faculty`);
 	},
 
@@ -61,6 +68,7 @@ export const deanApi = {
 		departmentId: number,
 		data: AppointHODRequest,
 	): Promise<DeanUser> {
+		debugLogger.info("deanApi", "appointHOD called");
 		return apiPost<AppointHODRequest, DeanUser>(
 			`/dean/departments/${departmentId}/hod`,
 			data,
@@ -68,10 +76,33 @@ export const deanApi = {
 	},
 
 	async demoteHOD(employeeId: number): Promise<DeanUser> {
+		debugLogger.info("deanApi", "demoteHOD called");
 		return apiDelete<DeanUser>(`/dean/hod/${employeeId}`);
 	},
 
 	async getHODHistory(): Promise<HODHistoryRecord[]> {
+		debugLogger.info("deanApi", "getHODHistory called");
 		return apiGet<HODHistoryRecord[]>("/dean/hod/history");
+	},
+
+	async createDepartment(data: CreateDepartmentRequest): Promise<Department> {
+		debugLogger.info("deanApi", "createDepartment called");
+		return apiPost<CreateDepartmentRequest, Department>("/dean/departments", data);
+	},
+
+	async updateDepartment(
+		departmentId: number,
+		data: UpdateDepartmentRequest,
+	): Promise<Department> {
+		debugLogger.info("deanApi", "updateDepartment called");
+		return apiPut<UpdateDepartmentRequest, Department>(
+			`/dean/departments/${departmentId}`,
+			data,
+		);
+	},
+
+	async deleteDepartment(departmentId: number): Promise<void> {
+		debugLogger.info("deanApi", "deleteDepartment called");
+		return apiDelete(`/dean/departments/${departmentId}`);
 	},
 };

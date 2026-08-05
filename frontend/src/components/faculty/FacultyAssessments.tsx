@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { lazy, Suspense, useCallback, memo } from "react";
+import { useNavigate } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDeferredMount } from "@/lib/useDeferredMount";
 import {
 	Plus,
 	Users,
@@ -9,111 +11,78 @@ import {
 	TrendingUp,
 	GraduationCap,
 } from "lucide-react";
-import { CreateAssessmentForm } from "@/components/assessments/CreateAssessmentForm";
-import { TestsList } from "@/components/assessments/TestsList";
-import { EnrollStudentsDialog } from "@/components/assessments/EnrollStudentsDialog";
-import { apiService } from "@/services/api";
-import type { Course, Test, CourseStats } from "@/services/api";
+
+import { TestsList } from "@/features/assessments/TestsList";
+import type { Course } from "@/services/api";
+import { useFacultyAssessments } from "./hooks/useFacultyAssessments";
+
+const CreateAssessmentForm = lazy(() =>
+	import("@/features/assessments/CreateAssessmentForm").then((m) => ({
+		default: m.CreateAssessmentForm,
+	}))
+);
+
+const EnrollStudentsDialog = lazy(() =>
+	import("@/features/assessments/EnrollStudentsDialog").then((m) => ({
+		default: m.EnrollStudentsDialog,
+	}))
+);
 
 interface FacultyAssessmentsProps {
 	selectedCourse: Course | null;
 }
 
-export function FacultyAssessments({
+export const FacultyAssessments = memo(function FacultyAssessments({
 	selectedCourse,
 }: FacultyAssessmentsProps) {
-	const [showCreateForm, setShowCreateForm] = useState(false);
-	const [showEnrollDialog, setShowEnrollDialog] = useState(false);
-	const [refreshTrigger, setRefreshTrigger] = useState(0);
-	const [testsCount, setTestsCount] = useState(0);
-	const [courseStats, setCourseStats] = useState<CourseStats | null>(null);
-	const [statsLoading, setStatsLoading] = useState(false);
+	const navigate = useNavigate();
+	const isListMounted = useDeferredMount(120);
 
-	useEffect(() => {
-		console.log(
-			"[FacultyAssessments] selectedCourse changed:",
-			selectedCourse?.offering_id ?? null,
-		);
-		if (!selectedCourse?.offering_id) {
-			console.log(
-				"[FacultyAssessments] No course selected — clearing stats",
-			);
-			setCourseStats(null);
-			return;
-		}
-		let cancelled = false;
-		setStatsLoading(true);
-		console.log(
-			"[FacultyAssessments] Fetching stats for offering_id:",
-			selectedCourse.offering_id,
-		);
-		apiService
-			.getFacultyCourseStats(selectedCourse.offering_id)
-			.then((data) => {
-				console.log("[FacultyAssessments] Stats fetched:", data);
-				if (!cancelled) setCourseStats(data);
-			})
-			.catch((err) => {
-				console.error("[FacultyAssessments] Stats fetch failed:", err);
-				if (!cancelled) setCourseStats(null);
-			})
-			.finally(() => {
-				if (!cancelled) setStatsLoading(false);
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [selectedCourse?.offering_id]);
+	const {
+		showCreateForm,
+		setShowCreateForm,
+		showEnrollDialog,
+		setShowEnrollDialog,
+		refreshTrigger,
+		testsCount,
+		setTestsCount,
+		courseStats,
+		statsLoading,
+		triggerRefresh,
+	} = useFacultyAssessments({ selectedCourse });
 
-	// Re-fetch stats when assessments list changes (create/delete)
-	useEffect(() => {
-		if (!selectedCourse?.offering_id || refreshTrigger === 0) return;
-		console.log(
-			"[FacultyAssessments] Refreshing stats after assessment change, trigger:",
-			refreshTrigger,
-		);
-		apiService
-			.getFacultyCourseStats(selectedCourse.offering_id)
-			.then((data) => {
-				console.log("[FacultyAssessments] Stats refreshed:", data);
-				setCourseStats(data);
-			})
-			.catch((err) =>
-				console.error(
-					"[FacultyAssessments] Stats refresh failed:",
-					err,
-				),
-			);
-	}, [refreshTrigger, selectedCourse?.offering_id]);
-
-	const handleAssessmentCreated = () => {
+	const handleAssessmentCreated = useCallback(() => {
 		console.log(
 			"[FacultyAssessments] Assessment created — triggering refresh",
 		);
 		setShowCreateForm(false);
-		setRefreshTrigger((prev) => prev + 1);
-	};
+		triggerRefresh();
+	}, [setShowCreateForm, triggerRefresh]);
 
-	const handleGoToMarks = (_test: Test) => {
-		// Navigate to marks entry — parent handles this via nav
-	};
+	const handleGoToMarks = useCallback((test: any) => {
+		navigate("/faculty/marks", { state: { testId: test.id } });
+	}, [navigate]);
 
 	return (
-		<div className="h-full flex flex-col">
+		<div className="h-full flex flex-col w-full max-w-full min-w-0">
 			{/* ── Page header + toolbar ─────────────────────────────────── */}
 			{!showCreateForm && (
-				<div className="px-6 pt-5 pb-4 border-b bg-background shrink-0 space-y-4">
+				<div className="p-4 sm:p-6 shrink-0 space-y-4 sm:space-y-5 bg-card/45 backdrop-blur-md border-b border-muted/50 relative overflow-hidden w-full max-w-full min-w-0">
+					{/* Ambient Top gradient glow */}
+					<div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-violet-500 via-indigo-500 to-transparent" />
+					
 					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 						<div>
-							<h3 className="text-base font-semibold">
-								Assessments
+							<h3 className="text-lg font-bold tracking-tight text-foreground">
+								Assessments Dashboard
 							</h3>
 							{selectedCourse ? (
-								<p className="text-sm text-muted-foreground mt-0.5">
-									{selectedCourse.course_code} —{" "}
-									{selectedCourse.course_name} &bull;{" "}
-									{selectedCourse.semester} Semester{" "}
-									{selectedCourse.year}
+								<p className="text-sm text-muted-foreground mt-0.5 font-medium flex items-center gap-1.5 flex-wrap">
+									<span className="text-indigo-500 font-semibold">{selectedCourse.course_code}</span>
+									<span>&bull;</span>
+									<span className="text-foreground">{selectedCourse.course_name}</span>
+									<span>&bull;</span>
+									<span className="text-muted-foreground">{selectedCourse.semester} Sem ({selectedCourse.year})</span>
 								</p>
 							) : (
 								<p className="text-sm text-muted-foreground mt-0.5">
@@ -121,20 +90,22 @@ export function FacultyAssessments({
 								</p>
 							)}
 						</div>
-						<div className="flex gap-2 shrink-0">
+						<div className="flex flex-wrap gap-2.5 shrink-0">
 							<Button
 								variant="outline"
 								size="sm"
 								onClick={() => setShowEnrollDialog(true)}
 								disabled={!selectedCourse}
+								className="rounded-xl border-muted/60 bg-background/50 hover:bg-violet-500/5 active:scale-95 duration-200 transition-all text-sm font-medium h-9"
 							>
-								<Users className="w-4 h-4 mr-2" />
+								<Users className="w-4 h-4 mr-2 text-violet-500" />
 								Enroll Students
 							</Button>
 							<Button
 								size="sm"
 								onClick={() => setShowCreateForm(true)}
 								disabled={!selectedCourse}
+								className="rounded-xl bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-600/15 active:scale-95 duration-200 transition-all text-sm font-medium h-9"
 							>
 								<Plus className="w-4 h-4 mr-2" />
 								Create Assessment
@@ -144,20 +115,20 @@ export function FacultyAssessments({
 
 					{/* Stat cards */}
 					{selectedCourse && (
-						<div className="grid grid-cols-3 gap-3">
+						<div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 w-full">
 							{/* Total Assessments */}
-							<div className="rounded-xl border bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-900/30 p-3 flex items-center gap-3">
-								<div className="h-9 w-9 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
+							<div className="rounded-xl border bg-blue-500/5 dark:bg-blue-500/10 border-blue-500/20 p-3 flex items-center gap-3.5 hover:bg-blue-500/10 transition-all duration-300">
+								<div className="h-9 w-9 rounded-lg bg-blue-500/10 dark:bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0 shadow-sm">
 									<ClipboardList className="w-4.5 h-4.5 text-blue-600 dark:text-blue-400" />
 								</div>
 								<div className="min-w-0">
-									<p className="text-xs text-blue-600/80 dark:text-blue-400/80 font-medium truncate">
+									<p className="text-xs text-blue-600/80 dark:text-blue-400/80 font-semibold truncate uppercase tracking-wider">
 										Total Assessments
 									</p>
 									{statsLoading ? (
 										<Skeleton className="h-5 w-8 mt-0.5" />
 									) : (
-										<p className="text-lg font-bold text-blue-700 dark:text-blue-300 leading-tight">
+										<p className="text-xl font-bold text-blue-700 dark:text-blue-300 leading-tight mt-0.5">
 											{courseStats?.totalAssessments ??
 												testsCount}
 										</p>
@@ -165,22 +136,22 @@ export function FacultyAssessments({
 								</div>
 							</div>
 							{/* Avg. Performance */}
-							<div className="rounded-xl border bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-900/30 p-3 flex items-center gap-3">
-								<div className="h-9 w-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center shrink-0">
+							<div className="rounded-xl border bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/20 p-3 flex items-center gap-3.5 hover:bg-emerald-500/10 transition-all duration-300">
+								<div className="h-9 w-9 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-sm">
 									<TrendingUp className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />
 								</div>
 								<div className="min-w-0">
-									<p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 font-medium truncate">
+									<p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 font-semibold truncate uppercase tracking-wider">
 										Avg. Performance
 									</p>
 									{statsLoading ? (
 										<Skeleton className="h-5 w-12 mt-0.5" />
 									) : courseStats?.avgPerformance != null ? (
-										<p className="text-lg font-bold text-emerald-700 dark:text-emerald-300 leading-tight">
+										<p className="text-xl font-bold text-emerald-700 dark:text-emerald-300 leading-tight mt-0.5">
 											{courseStats.avgPerformance}%
 										</p>
 									) : (
-										<div>
+										<div className="mt-0.5">
 											<p className="text-sm font-bold text-emerald-700/60 dark:text-emerald-300/60 leading-tight">
 												No marks yet
 											</p>
@@ -197,18 +168,18 @@ export function FacultyAssessments({
 								</div>
 							</div>
 							{/* Active Students */}
-							<div className="rounded-xl border bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-900/30 p-3 flex items-center gap-3">
-								<div className="h-9 w-9 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
-									<GraduationCap className="w-4.5 h-4.5 text-amber-600 dark:text-amber-400" />
+							<div className="rounded-xl border bg-violet-500/5 dark:bg-violet-500/10 border-violet-500/20 p-3 flex items-center gap-3.5 hover:bg-violet-500/10 transition-all duration-300">
+								<div className="h-9 w-9 rounded-lg bg-violet-500/10 dark:bg-violet-500/20 border border-violet-500/30 flex items-center justify-center shrink-0 shadow-sm">
+									<GraduationCap className="w-4.5 h-4.5 text-violet-600 dark:text-violet-400" />
 								</div>
 								<div className="min-w-0">
-									<p className="text-xs text-amber-600/80 dark:text-amber-400/80 font-medium truncate">
+									<p className="text-xs text-violet-600/80 dark:text-violet-400/80 font-semibold truncate uppercase tracking-wider">
 										Active Students
 									</p>
 									{statsLoading ? (
 										<Skeleton className="h-5 w-8 mt-0.5" />
 									) : (
-										<p className="text-lg font-bold text-amber-700 dark:text-amber-300 leading-tight">
+										<p className="text-xl font-bold text-violet-700 dark:text-violet-300 leading-tight mt-0.5">
 											{courseStats?.activeStudents ?? "—"}
 										</p>
 									)}
@@ -220,42 +191,75 @@ export function FacultyAssessments({
 			)}
 
 			{/* ── Main content ─────────────────────────────────────────── */}
-			<div className="flex-1 overflow-hidden">
+			<div className="flex-1 overflow-hidden w-full max-w-full min-w-0">
 				{showCreateForm ? (
-					<CreateAssessmentForm
-						selectedCourse={selectedCourse}
-						onSuccess={handleAssessmentCreated}
-						onCancel={() => setShowCreateForm(false)}
-						contextStats={
-							courseStats
-								? {
-										assessments:
-											courseStats.totalAssessments,
-										students: courseStats.activeStudents,
-									}
-								: null
+					<Suspense
+						fallback={
+							<div className="p-6">
+								<Skeleton className="h-[400px] w-full rounded-2xl" />
+							</div>
 						}
-					/>
+					>
+						<CreateAssessmentForm
+							selectedCourse={selectedCourse}
+							onSuccess={handleAssessmentCreated}
+							onCancel={() => setShowCreateForm(false)}
+							contextStats={
+								courseStats
+									? {
+											assessments:
+												courseStats.totalAssessments,
+											students: courseStats.activeStudents,
+										}
+									: null
+							}
+						/>
+					</Suspense>
 				) : (
-					<ScrollArea className="h-full">
-						<div className="p-6">
-							<TestsList
-								course={selectedCourse}
-								refreshTrigger={refreshTrigger}
-								onGoToMarks={handleGoToMarks}
-								onCountChange={setTestsCount}
-							/>
+					<ScrollArea className="h-full w-full max-w-full">
+						<div className="p-3 sm:p-6 w-full max-w-full min-w-0">
+							<div className="bg-card/70 backdrop-blur-sm border border-muted/50 rounded-2xl overflow-hidden shadow-lg shadow-black/5 hover:shadow-xl transition-all duration-300 w-full max-w-full min-w-0">
+								<div className="h-[2px] bg-gradient-to-r from-violet-500/60 to-indigo-500/60" />
+								<div className="p-3 sm:p-6 w-full max-w-full min-w-0">
+									{isListMounted ? (
+										<TestsList
+											course={selectedCourse}
+											refreshTrigger={refreshTrigger}
+											onGoToMarks={handleGoToMarks}
+											onCountChange={setTestsCount}
+										/>
+									) : (
+										<div className="space-y-4">
+											<Skeleton className="h-8 w-1/3 rounded-lg" />
+											<div className="space-y-3">
+												{Array.from({ length: 4 }).map((_, i) => (
+													<div key={i} className="flex gap-4 items-center">
+														<Skeleton className="h-9 w-24 rounded-lg shrink-0" />
+														<Skeleton className="h-9 flex-1 rounded-lg" />
+														<Skeleton className="h-9 w-16 rounded-lg shrink-0" />
+														<Skeleton className="h-9 w-16 rounded-lg shrink-0" />
+													</div>
+												))}
+											</div>
+										</div>
+									)}
+								</div>
+							</div>
 						</div>
 					</ScrollArea>
 				)}
 			</div>
 
 			{/* ── Enroll Students Dialog ────────────────────────────────── */}
-			<EnrollStudentsDialog
-				open={showEnrollDialog}
-				onOpenChange={setShowEnrollDialog}
-				course={selectedCourse}
-			/>
+			{showEnrollDialog && (
+				<Suspense fallback={null}>
+					<EnrollStudentsDialog
+						open={showEnrollDialog}
+						onOpenChange={setShowEnrollDialog}
+						course={selectedCourse}
+					/>
+				</Suspense>
+			)}
 		</div>
 	);
-}
+});

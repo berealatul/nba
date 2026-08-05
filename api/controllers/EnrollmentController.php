@@ -9,6 +9,8 @@ require_once __DIR__ . '/../models/UserRepository.php';
 
 class EnrollmentController
 {
+    protected $auditService;
+
     private $enrollmentRepo;
     private $courseRepo;
     private $offeringRepo;
@@ -17,8 +19,10 @@ class EnrollmentController
     private $userRepo;
     private $pdo;
 
-    public function __construct($pdo)
+    public function __construct($pdo, ?AuditService $auditService = null)
     {
+        $this->auditService = $auditService;
+
         $this->pdo = $pdo;
         $this->enrollmentRepo = new EnrollmentRepository($pdo);
         $this->courseRepo = new CourseRepository($pdo);
@@ -103,6 +107,7 @@ class EnrollmentController
 
             // Check if the authenticated user is authorized for this offering
             if (!$this->isOfferingAccessAllowed($offeringId, $userId)) {
+                if (isset($GLOBALS['fileLogger'])) { $GLOBALS['fileLogger']->warn('EnrollmentController', 'Unauthorized access attempt', ['user' => $_REQUEST['authenticated_user'] ?? 'anonymous']); }
                 http_response_code(403);
                 echo json_encode([
                     'success' => false,
@@ -160,9 +165,18 @@ class EnrollmentController
                         return;
                     }
 
-                    // Create new student with course's department
+                    // Create new student with the department's default programme
                     $departmentId = $course->getDepartmentId() ?? $faculty->getDepartmentId();
-                    $student = new Student($rollno, $name, $departmentId);
+                    $programmeId = $this->studentRepo->findFirstProgrammeIdByDepartment((int)$departmentId);
+                    if (!$programmeId) {
+                        http_response_code(400);
+                        echo json_encode([
+                            'success' => false,
+                            'message' => "No programme configured for department ID {$departmentId}"
+                        ]);
+                        return;
+                    }
+                    $student = new Student($rollno, $name, $programmeId);
                     $this->studentRepo->save($student);
                 }
 
@@ -177,6 +191,14 @@ class EnrollmentController
 
             // Return results
             http_response_code(200);
+            
+            $auditPayload = isset($input) ? $input : (isset($data) ? $data : null);
+            if (isset($this->auditService)) {
+                $this->auditService->log('CREATE', 'bulkEnroll', null, null, $auditPayload);
+            }
+            if (isset($GLOBALS['fileLogger'])) {
+                $GLOBALS['fileLogger']->log('INFO', 'EnrollmentController', 'CREATE operation successful in bulkEnroll');
+            }
             echo json_encode([
                 'success' => true,
                 'message' => "Enrollment completed: {$results['success_count']} successful, {$results['failure_count']} failed",
@@ -211,6 +233,7 @@ class EnrollmentController
 
             // Check if the authenticated user is authorized for this offering
             if (!$this->isOfferingAccessAllowed($offeringId, $userId)) {
+                if (isset($GLOBALS['fileLogger'])) { $GLOBALS['fileLogger']->warn('EnrollmentController', 'Unauthorized access attempt', ['user' => $_REQUEST['authenticated_user'] ?? 'anonymous']); }
                 http_response_code(403);
                 echo json_encode([
                     'success' => false,
@@ -318,6 +341,7 @@ class EnrollmentController
 
             // Check if the authenticated user is authorized for this offering
             if (!$this->isOfferingAccessAllowed($offeringId, $userId)) {
+                if (isset($GLOBALS['fileLogger'])) { $GLOBALS['fileLogger']->warn('EnrollmentController', 'Unauthorized access attempt', ['user' => $_REQUEST['authenticated_user'] ?? 'anonymous']); }
                 http_response_code(403);
                 echo json_encode([
                     'success' => false,
@@ -340,9 +364,88 @@ class EnrollmentController
             $this->enrollmentRepo->removeEnrollment($offeringId, $rollno);
 
             http_response_code(200);
+            
+            $auditPayload = isset($input) ? $input : (isset($data) ? $data : null);
+            if (isset($this->auditService)) {
+                $this->auditService->log('CREATE', 'removeEnrollment', null, null, $auditPayload);
+            }
+            if (isset($GLOBALS['fileLogger'])) {
+                $GLOBALS['fileLogger']->log('INFO', 'EnrollmentController', 'CREATE operation successful in removeEnrollment');
+            }
             echo json_encode([
                 'success' => true,
                 'message' => 'Student removed from course offering successfully'
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Server error: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * PUT /offerings/{offeringId}/enrollments/{rollno}
+     * Update enrollment properties (specifically is_repeater status)
+     */
+    public function updateEnrollment($offeringId, $rollno, $userId)
+    {
+        try {
+            // Verify offering exists
+            $offering = $this->offeringRepo->findById($offeringId);
+            if (!$offering) {
+                http_response_code(404);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Course offering not found'
+                ]);
+                return;
+            }
+
+            // Check authorization
+            if (!$this->isOfferingAccessAllowed($offeringId, $userId)) {
+                http_response_code(403);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'You are not authorized to manage enrollments for this offering'
+                ]);
+                return;
+            }
+
+            // Verify student is enrolled
+            if (!$this->enrollmentRepo->isEnrolled($offeringId, $rollno)) {
+                http_response_code(404);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Student is not enrolled in this offering'
+                ]);
+                return;
+            }
+
+            // Get input body
+            $input = json_decode(file_get_contents('php://input'), true);
+            if (!isset($input['is_repeater'])) {
+                http_response_code(400);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Missing parameter: is_repeater'
+                ]);
+                return;
+            }
+
+            $isRepeater = (bool)$input['is_repeater'];
+
+            // Update in DB
+            $this->enrollmentRepo->updateRepeaterStatus($offeringId, $rollno, $isRepeater);
+
+            http_response_code(200);
+            if (isset($this->auditService)) {
+                $this->auditService->log('UPDATE', 'updateEnrollment', null, null, $input);
+            }
+            echo json_encode([
+                'success' => true,
+                'message' => 'Enrollment status updated successfully'
             ]);
         } catch (Exception $e) {
             http_response_code(500);

@@ -13,7 +13,10 @@ class JWTService
 
     public function __construct($secretKey = null, $tokenExpiry = 3600)
     {
-        $this->secretKey = $secretKey ?: 'your-secret-key-change-this-in-production';
+        if (empty($secretKey)) {
+            throw new Exception("JWT Secret Key is not configured in the environment.");
+        }
+        $this->secretKey = $secretKey;
         $this->algorithm = 'HS256';
         $this->tokenExpiry = $tokenExpiry; // 1 hour default
     }
@@ -35,7 +38,7 @@ class JWTService
             'role' => $user->getRole(),
             'department_id' => $user->getDepartmentId(),
             'designation' => $user->getDesignation(),
-            'phone' => $user->getPhone(),
+            'phones' => $user->getPhones(),
             'iat' => time(),
             'exp' => time() + $this->tokenExpiry
         ];
@@ -74,6 +77,11 @@ class JWTService
     {
         $parts = explode('.', $token);
         if (count($parts) !== 3) {
+            if (isset($GLOBALS['fileLogger'])) { 
+                $GLOBALS['fileLogger']->warn('JWTService', 'Token validation failed: Malformed token (expected 3 parts)', [
+                    'token_segment_count' => count($parts)
+                ]); 
+            }
             return null;
         }
 
@@ -86,6 +94,9 @@ class JWTService
         $expectedSignatureEncoded = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($expectedSignature));
 
         if (!hash_equals($signature, $expectedSignatureEncoded)) {
+            if (isset($GLOBALS['fileLogger'])) { 
+                $GLOBALS['fileLogger']->warn('JWTService', 'Token validation failed: Signature verification mismatch'); 
+            }
             return null;
         }
 
@@ -94,6 +105,13 @@ class JWTService
 
         // Check expiry
         if (isset($payloadDecoded['exp']) && $payloadDecoded['exp'] < time()) {
+            if (isset($GLOBALS['fileLogger'])) { 
+                $GLOBALS['fileLogger']->warn('JWTService', 'Token validation failed: Token expired', [
+                    'expired_at' => date('Y-m-d H:i:s', $payloadDecoded['exp']),
+                    'current_time' => date('Y-m-d H:i:s'),
+                    'employee_id' => $payloadDecoded['employee_id'] ?? 'unknown'
+                ]); 
+            }
             return null;
         }
 

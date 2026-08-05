@@ -1,29 +1,7 @@
-﻿import { useState, useEffect, useMemo, useCallback } from "react";
-import { facultyApi } from "@/services/api/faculty";
-import type { EnrolledStudent, UpdateStudentRequest } from "@/services/api";
-import { DataTable } from "@/components/shared/DataTable";
-import type { ColumnDef } from "@tanstack/react-table";
+import { ConfirmDeleteDialog } from "@/features/shared";
+import { useMemo, memo } from "react";
+import { DataTable } from "@/features/shared/DataTable";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogFooter,
-} from "@/components/ui/dialog";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import {
 	Select,
 	SelectContent,
@@ -31,329 +9,45 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-	ArrowUpDown,
-	GraduationCap,
-	Pencil,
-	RefreshCw,
-	Trash2,
-	X,
-} from "lucide-react";
-import { toast } from "sonner";
-
-const STATUS_OPTIONS = ["Active", "Inactive", "Graduated", "Dropped"];
+import { GraduationCap, RefreshCw, X } from "lucide-react";
+import { getFacultyStudentsColumns } from "./FacultyStudents.columns";
+import { EditStudentDialog } from "./components/EditStudentDialog";
+import { useFacultyStudents } from "./hooks/useFacultyStudents";
+import { BATCH_OPTIONS, STATUS_OPTIONS } from "./constants";
 
 interface FacultyStudentsProps {
 	hideHeader?: boolean;
 }
 
-export function FacultyStudents({
+export const FacultyStudents = memo(function FacultyStudents({
 	hideHeader = false,
 }: FacultyStudentsProps = {}) {
-	// ── Data ──────────────────────────────────────────────────────────────────
-	const [allStudents, setAllStudents] = useState<EnrolledStudent[]>([]);
-	const [loading, setLoading] = useState(true);
+	const {
+		loading,
+		statusFilter,
+		setStatusFilter,
+		batchInput,
+		setBatchInput,
+		hasFilters,
+		editTarget,
+		setEditTarget,
+		deleteTarget,
+		setDeleteTarget,
+		deleteLoading,
+		filtered,
+		loadStudents,
+		resetFilters,
+		handleDelete,
+		handleEditSuccess,
+	} = useFacultyStudents();
 
-	// ── Filters ───────────────────────────────────────────────────────────────
-	const [statusFilter, setStatusFilter] = useState<string>("all");
-	const [batchInput, setBatchInput] = useState("");
-	const [batchFilter, setBatchFilter] = useState("");
-
-	// Debounce batch year
-	useEffect(() => {
-		const t = setTimeout(() => setBatchFilter(batchInput), 500);
-		return () => clearTimeout(t);
-	}, [batchInput]);
-
-	const hasFilters = statusFilter !== "all" || batchFilter !== "";
-
-	// ── Edit state ────────────────────────────────────────────────────────────
-	const [editTarget, setEditTarget] = useState<EnrolledStudent | null>(null);
-	const [editForm, setEditForm] = useState<UpdateStudentRequest>({});
-	const [editSaving, setEditSaving] = useState(false);
-
-	// ── Delete state ──────────────────────────────────────────────────────────
-	const [deleteTarget, setDeleteTarget] = useState<EnrolledStudent | null>(
-		null,
-	);
-	const [deleteLoading, setDeleteLoading] = useState(false);
-
-	// ── Load ──────────────────────────────────────────────────────────────────
-	const loadStudents = useCallback(async () => {
-		setLoading(true);
-		try {
-			const data = await facultyApi.getEnrolledStudents();
-			setAllStudents(data);
-		} catch {
-			toast.error("Failed to load students");
-		} finally {
-			setLoading(false);
-		}
-	}, []);
-
-	useEffect(() => {
-		loadStudents();
-	}, [loadStudents]);
-
-	// ── Client-side filter ────────────────────────────────────────────────────
-	const filtered = useMemo(() => {
-		let result = allStudents;
-		if (statusFilter !== "all")
-			result = result.filter(
-				(s) =>
-					s.student_status?.toLowerCase() ===
-					statusFilter.toLowerCase(),
-			);
-		if (batchFilter)
-			result = result.filter((s) => String(s.batch_year) === batchFilter);
-		return result;
-	}, [allStudents, statusFilter, batchFilter]);
-
-	const handleEditOpen = (student: EnrolledStudent) => {
-		setEditTarget(student);
-		setEditForm({
-			student_name: student.student_name,
-			email: student.email ?? "",
-			phone: student.phone ?? "",
-			student_status: student.student_status,
-			batch_year: student.batch_year,
-		});
-	};
-
-	const resetFilters = () => {
-		setStatusFilter("all");
-		setBatchInput("");
-		setBatchFilter("");
-	};
-
-	const handleEditSave = async () => {
-		if (!editTarget) return;
-		setEditSaving(true);
-		try {
-			await facultyApi.updateStudent(editTarget.roll_no, editForm);
-			toast.success("Student updated successfully");
-			setEditTarget(null);
-			// Patch local state to avoid full reload
-			setAllStudents((prev) =>
-				prev.map((s) =>
-					s.roll_no === editTarget.roll_no
-						? {
-								...s,
-								student_name:
-									editForm.student_name ?? s.student_name,
-								email:
-									(editForm.email as
-										| string
-										| null
-										| undefined) ?? s.email,
-								phone:
-									(editForm.phone as
-										| string
-										| null
-										| undefined) ?? s.phone,
-								student_status:
-									editForm.student_status ?? s.student_status,
-								batch_year: editForm.batch_year ?? s.batch_year,
-							}
-						: s,
-				),
-			);
-		} catch {
-			toast.error("Failed to update student");
-		} finally {
-			setEditSaving(false);
-		}
-	};
-
-	const handleDelete = async () => {
-		if (!deleteTarget) return;
-		setDeleteLoading(true);
-		try {
-			await facultyApi.removeStudentEnrollment(deleteTarget.roll_no);
-			toast.success(
-				`${deleteTarget.student_name} removed from your course enrollments`,
-			);
-			setAllStudents((prev) =>
-				prev.filter((s) => s.roll_no !== deleteTarget.roll_no),
-			);
-			setDeleteTarget(null);
-		} catch {
-			toast.error("Failed to remove student");
-		} finally {
-			setDeleteLoading(false);
-		}
-	};
-
-	const statusVariant = (status: string) => {
-		switch (status?.toLowerCase()) {
-			case "active":
-				return "default";
-			case "graduated":
-				return "secondary";
-			case "inactive":
-			case "dropped":
-				return "destructive";
-			default:
-				return "outline";
-		}
-	};
-
-	const columns = useMemo<ColumnDef<EnrolledStudent>[]>(
-		() => [
-			{
-				accessorKey: "roll_no",
-				header: ({ column }) => (
-					<Button
-						variant="ghost"
-						onClick={() =>
-							column.toggleSorting(column.getIsSorted() === "asc")
-						}
-					>
-						Roll No
-						<ArrowUpDown className="ml-2 h-4 w-4" />
-					</Button>
-				),
-				cell: ({ row }) => (
-					<Badge variant="outline" className="font-mono text-xs">
-						{row.original.roll_no}
-					</Badge>
-				),
-			},
-			{
-				accessorKey: "student_name",
-				header: ({ column }) => (
-					<Button
-						variant="ghost"
-						onClick={() =>
-							column.toggleSorting(column.getIsSorted() === "asc")
-						}
-					>
-						Name
-						<ArrowUpDown className="ml-2 h-4 w-4" />
-					</Button>
-				),
-				cell: ({ row }) => (
-					<div className="font-medium">
-						{row.original.student_name}
-					</div>
-				),
-			},
-			{
-				accessorKey: "department_code",
-				header: "Department",
-				cell: ({ row }) => (
-					<Badge
-						variant="secondary"
-						className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300"
-					>
-						{row.original.department_code ??
-							row.original.department_name}
-					</Badge>
-				),
-			},
-			{
-				accessorKey: "batch_year",
-				header: ({ column }) => (
-					<Button
-						variant="ghost"
-						onClick={() =>
-							column.toggleSorting(column.getIsSorted() === "asc")
-						}
-					>
-						Batch
-						<ArrowUpDown className="ml-2 h-4 w-4" />
-					</Button>
-				),
-				cell: ({ row }) => row.original.batch_year ?? "—",
-			},
-			{
-				accessorKey: "email",
-				header: "Email",
-				cell: ({ row }) => (
-					<Badge variant="outline" className="flex">
-						{row.original.email ?? "—"}
-					</Badge>
-				),
-			},
-			{
-				accessorKey: "phone",
-				header: "Phone",
-				cell: ({ row }) => (
-					<div className="text-muted-foreground font-mono flex">
-						{row.original.phone ?? "—"}
-					</div>
-				),
-			},
-			{
-				accessorKey: "student_status",
-				header: "Status",
-				cell: ({ row }) => (
-					<Badge variant={statusVariant(row.original.student_status)}>
-						{row.original.student_status}
-					</Badge>
-				),
-			},
-			{
-				accessorKey: "enrolled_courses",
-				header: "Enrolled In",
-				cell: ({ row }) => {
-					const courses = row.original.enrolled_courses
-						? row.original.enrolled_courses.split(", ")
-						: [];
-					return (
-						<div className="flex flex-col gap-1">
-							{courses.length > 0 ? (
-								courses.map((course, idx) => (
-									<Badge
-										key={idx}
-										variant="outline"
-										className="py-0 px-1.5"
-									>
-										{course}
-									</Badge>
-								))
-							) : (
-								<span className="text-xs text-muted-foreground">
-									—
-								</span>
-							)}
-						</div>
-					);
-				},
-			},
-			{
-				id: "actions",
-				header: "Actions",
-				cell: ({ row }) => (
-					<div className="flex items-center gap-1">
-						<Button
-							variant="ghost"
-							size="icon"
-							className="h-8 w-8"
-							onClick={() => handleEditOpen(row.original)}
-						>
-							<Pencil className="h-4 w-4" />
-						</Button>
-						<Button
-							variant="ghost"
-							size="icon"
-							className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-							onClick={() => setDeleteTarget(row.original)}
-						>
-							<Trash2 className="h-4 w-4" />
-						</Button>
-					</div>
-				),
-			},
-		],
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-		[],
+	const columns = useMemo(
+		() => getFacultyStudentsColumns(setEditTarget, setDeleteTarget),
+		[setEditTarget, setDeleteTarget],
 	);
 
-	// ── Render ──────────────────────────────────────────────────────────────────
 	return (
-		<div className="h-full overflow-y-auto">
+		<div className="h-full">
 			<div className="px-6 pt-4 pb-8 space-y-6">
 				{/* Page header */}
 				{!hideHeader && (
@@ -385,37 +79,68 @@ export function FacultyStudents({
 				)}
 
 				{/* Table card */}
-				<Card>
-					<CardHeader>
-						<CardTitle className="flex items-center gap-2">
-							<GraduationCap className="w-5 h-5" />
-							All Students
-						</CardTitle>
-					</CardHeader>
-					<CardContent>
+				<div className="bg-card/45 backdrop-blur-md border border-muted/50 rounded-2xl overflow-hidden shadow-lg shadow-black/5 hover:shadow-xl transition-all duration-300 relative">
+					<div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-violet-500 via-indigo-500 to-transparent" />
+					<div className="p-6 border-b border-muted/50 flex items-center justify-between">
+						<h3 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
+							<GraduationCap className="w-5 h-5 text-indigo-500" />
+							All Enrolled Students
+						</h3>
+						<Button
+							variant="outline"
+							size="icon"
+							onClick={loadStudents}
+							disabled={loading}
+							className="rounded-xl border-muted/60 bg-background/50 hover:bg-violet-500/5 active:scale-95 duration-200 transition-all"
+						>
+							<RefreshCw
+								className={`h-4 w-4 text-violet-500 ${loading ? "animate-spin" : ""}`}
+							/>
+						</Button>
+					</div>
+					<div className="p-6">
 						<DataTable
 							columns={columns}
-							data={filtered}
+							data={filtered || []}
+							searchKey="student_name"
 							searchPlaceholder="Search by roll no, name or email..."
 							refreshing={loading}
 						>
 							{/* Batch Year */}
-							<Input
-								placeholder="Batch Year"
-								value={batchInput}
-								onChange={(e) => setBatchInput(e.target.value)}
-								className="h-9 w-[120px]"
-							/>
+							<Select
+								value={batchInput || "all"}
+								onValueChange={(val) => {
+									const actualVal = val === "all" ? "" : val;
+									setBatchInput(actualVal);
+								}}
+							>
+								<SelectTrigger className="h-9 w-[130px] rounded-xl border-muted/65 bg-background/50 focus:ring-violet-500/20">
+									<SelectValue placeholder="Batch Year" />
+								</SelectTrigger>
+								<SelectContent className="rounded-xl">
+									<SelectItem value="all">
+										All Batches
+									</SelectItem>
+									{BATCH_OPTIONS.map((y) => (
+										<SelectItem
+											key={y}
+											value={y.toString()}
+										>
+											{y}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
 
 							{/* Status */}
 							<Select
 								value={statusFilter}
 								onValueChange={setStatusFilter}
 							>
-								<SelectTrigger className="h-9 w-[140px]">
+								<SelectTrigger className="h-9 w-[140px] rounded-xl border-muted/65 bg-background/50 focus:ring-violet-500/20">
 									<SelectValue placeholder="All Status" />
 								</SelectTrigger>
-								<SelectContent>
+								<SelectContent className="rounded-xl">
 									<SelectItem value="all">
 										All Status
 									</SelectItem>
@@ -431,159 +156,45 @@ export function FacultyStudents({
 							{hasFilters && (
 								<Button
 									variant="ghost"
-									className="h-9 px-2"
+									className="h-9 px-3 shrink-0 rounded-xl hover:bg-rose-500/5 hover:text-rose-600 active:scale-95 duration-200 transition-all font-medium text-xs uppercase tracking-wider"
 									onClick={resetFilters}
 								>
 									Reset
-									<X className="ml-2 h-4 w-4" />
+									<X className="ml-1.5 h-3.5 w-3.5 text-rose-500" />
 								</Button>
 							)}
 						</DataTable>
-					</CardContent>
-				</Card>
+					</div>
+				</div>
 			</div>
 
-			{/* ── Edit Dialog ── */}
-			<Dialog
-				open={!!editTarget}
-				onOpenChange={(open) => !open && setEditTarget(null)}
-			>
-				<DialogContent className="max-w-md">
-					<DialogHeader>
-						<DialogTitle>
-							Edit Student — {editTarget?.roll_no}
-						</DialogTitle>
-					</DialogHeader>
+			{/* -- Edit Dialog -- */}
+			{editTarget && (
+				<EditStudentDialog
+					student={editTarget}
+					onClose={() => setEditTarget(null)}
+					onSuccess={handleEditSuccess}
+				/>
+			)}
 
-					<div className="space-y-4 py-2">
-						<div className="space-y-1.5">
-							<Label>Full Name</Label>
-							<Input
-								value={editForm.student_name ?? ""}
-								onChange={(e) =>
-									setEditForm((f) => ({
-										...f,
-										student_name: e.target.value,
-									}))
-								}
-							/>
-						</div>
-						<div className="grid grid-cols-2 gap-4">
-							<div className="space-y-1.5">
-								<Label>Email</Label>
-								<Input
-									type="email"
-									value={editForm.email ?? ""}
-									onChange={(e) =>
-										setEditForm((f) => ({
-											...f,
-											email: e.target.value || null,
-										}))
-									}
-								/>
-							</div>
-							<div className="space-y-1.5">
-								<Label>Phone</Label>
-								<Input
-									value={editForm.phone ?? ""}
-									onChange={(e) =>
-										setEditForm((f) => ({
-											...f,
-											phone: e.target.value || null,
-										}))
-									}
-								/>
-							</div>
-						</div>
-						<div className="grid grid-cols-2 gap-4">
-							<div className="space-y-1.5">
-								<Label>Batch Year</Label>
-								<Input
-									type="number"
-									value={editForm.batch_year ?? ""}
-									onChange={(e) =>
-										setEditForm((f) => ({
-											...f,
-											batch_year: e.target.value
-												? Number(e.target.value)
-												: undefined,
-										}))
-									}
-								/>
-							</div>
-							<div className="space-y-1.5">
-								<Label>Status</Label>
-								<Select
-									value={editForm.student_status ?? "Active"}
-									onValueChange={(v) =>
-										setEditForm((f) => ({
-											...f,
-											student_status: v,
-										}))
-									}
-								>
-									<SelectTrigger>
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										{STATUS_OPTIONS.map((s) => (
-											<SelectItem key={s} value={s}>
-												{s}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-						</div>
-					</div>
-
-					<DialogFooter>
-						<Button
-							variant="outline"
-							onClick={() => setEditTarget(null)}
-							disabled={editSaving}
-						>
-							Cancel
-						</Button>
-						<Button onClick={handleEditSave} disabled={editSaving}>
-							{editSaving ? "Saving…" : "Save Changes"}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-
-			{/* ── Delete Confirm ── */}
-			<AlertDialog
+			{/* -- Delete Confirm -- */}
+			<ConfirmDeleteDialog
 				open={!!deleteTarget}
-				onOpenChange={(open) => !open && setDeleteTarget(null)}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>
-							Remove Student Enrollment
-						</AlertDialogTitle>
-						<AlertDialogDescription>
-							This will remove{" "}
-							<strong>{deleteTarget?.student_name}</strong> (
-							{deleteTarget?.roll_no}) from all of your course
-							enrollments. Their marks and data will remain
-							intact. This action cannot be undone.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel disabled={deleteLoading}>
-							Cancel
-						</AlertDialogCancel>
-						<AlertDialogAction
-							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-							onClick={handleDelete}
-							disabled={deleteLoading}
-						>
-							{deleteLoading ? "Removing…" : "Remove"}
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
+				onOpenChange={(open: boolean) => !open && setDeleteTarget(null)}
+				title="Remove Student Enrollment"
+				description={
+					<>
+						This will remove{" "}
+						<strong>{deleteTarget?.student_name}</strong> (
+						{deleteTarget?.roll_no}) from all of your course
+						enrollments. Their marks and data will remain intact.
+						This action cannot be undone.
+					</>
+				}
+				confirmText="Remove"
+				isLoading={deleteLoading}
+				onConfirm={handleDelete}
+			/>
 		</div>
 	);
-}
+});

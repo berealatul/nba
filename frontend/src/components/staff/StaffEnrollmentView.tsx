@@ -1,6 +1,6 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/shared/DataTable";
+import { DataTable } from "@/features/shared/DataTable";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
 	Select,
@@ -11,9 +11,6 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -25,21 +22,12 @@ import {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-	BookOpen,
-	Upload,
-	Download,
-	Users,
-	Trash2,
-	CheckCircle2,
-	FileText,
-	UserPlus,
-	X,
-} from "lucide-react";
+import { BookOpen, Users, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { staffApi } from "@/services/api";
 import type { StaffCourse, Enrollment } from "@/services/api";
 import { usePaginatedData } from "@/lib/usePaginatedData";
+import { StaffStudentUpload } from "./StaffStudentUpload";
 
 interface StudentEntry {
 	rollno: string;
@@ -47,12 +35,20 @@ interface StudentEntry {
 }
 
 export function StaffEnrollmentView() {
+	const currentYear = new Date().getFullYear();
+	const currentSemester = new Date().getMonth() < 6 ? "Spring" : "Autumn";
+
 	const {
 		data: courses,
 		refresh: refreshCourses,
 		loading: isLoading,
 	} = usePaginatedData<StaffCourse>({
-		fetchFn: staffApi.getDepartmentCourses,
+		fetchFn: (params) =>
+			staffApi.getDepartmentCourses({
+				...params,
+				year: currentYear.toString(),
+				semester: currentSemester,
+			}),
 		limit: 100,
 	});
 	const [selectedCourse, setSelectedCourse] = useState<StaffCourse | null>(
@@ -60,11 +56,8 @@ export function StaffEnrollmentView() {
 	);
 	const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
 	const [loadingEnrollments, setLoadingEnrollments] = useState(false);
-	const [file, setFile] = useState<File | null>(null);
 	const [students, setStudents] = useState<StudentEntry[]>([]);
-	const [, setUploading] = useState(false);
 	const [enrolling, setEnrolling] = useState(false);
-	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const enrollmentColumns = useMemo<ColumnDef<Enrollment>[]>(
 		() => [
@@ -72,23 +65,30 @@ export function StaffEnrollmentView() {
 				accessorKey: "student_rollno",
 				header: "Roll No",
 				cell: ({ row }) => (
-					<Badge variant="outline">
+					<span className="font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md text-xs font-semibold shadow-sm">
 						{row.original.student_rollno}
-					</Badge>
+					</span>
 				),
 			},
 			{
 				accessorKey: "student_name",
 				header: "Name",
+				cell: ({ row }) => (
+					<span className="font-semibold text-foreground">{row.original.student_name}</span>
+				),
 			},
 			{
 				accessorKey: "enrolled_at",
 				header: "Enrolled At",
 				cell: ({ row }) => (
-					<span className="text-sm text-gray-500">
+					<span className="text-sm font-medium text-muted-foreground">
 						{new Date(
 							row.original.enrolled_at,
-						).toLocaleDateString()}
+						).toLocaleDateString(undefined, {
+							year: "numeric",
+							month: "short",
+							day: "numeric",
+						})}
 					</span>
 				),
 			},
@@ -103,27 +103,27 @@ export function StaffEnrollmentView() {
 								<Button
 									variant="ghost"
 									size="icon"
-									className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+									className="h-8 w-8 text-rose-500 hover:text-rose-600 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 active:scale-95 duration-200 transition-all rounded-lg"
 								>
 									<Trash2 className="w-4 h-4" />
 								</Button>
 							</AlertDialogTrigger>
-							<AlertDialogContent>
+							<AlertDialogContent className="bg-card/90 backdrop-blur-lg border border-muted/50 rounded-2xl max-w-md">
 								<AlertDialogHeader>
-									<AlertDialogTitle>
+									<AlertDialogTitle className="text-lg font-bold text-foreground">
 										Remove Student
 									</AlertDialogTitle>
-									<AlertDialogDescription>
+									<AlertDialogDescription className="text-muted-foreground text-sm leading-relaxed">
 										Are you sure you want to remove{" "}
-										<strong>
+										<strong className="text-foreground font-semibold">
 											{enrollment.student_name}
 										</strong>{" "}
 										({enrollment.student_rollno}) from this
 										course? This action cannot be undone.
 									</AlertDialogDescription>
 								</AlertDialogHeader>
-								<AlertDialogFooter>
-									<AlertDialogCancel>
+								<AlertDialogFooter className="mt-4 gap-2">
+									<AlertDialogCancel className="bg-background/60 shadow-sm border-muted/50 rounded-xl active:scale-95 duration-200 transition-all font-semibold">
 										Cancel
 									</AlertDialogCancel>
 									<AlertDialogAction
@@ -132,7 +132,7 @@ export function StaffEnrollmentView() {
 												enrollment.student_rollno,
 											)
 										}
-										className="bg-red-500 hover:bg-red-600"
+										className="bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white font-semibold rounded-xl active:scale-95 duration-200 transition-all border border-red-500/30 shadow-md shadow-red-500/10"
 									>
 										Remove
 									</AlertDialogAction>
@@ -143,62 +143,24 @@ export function StaffEnrollmentView() {
 				},
 			},
 		],
-		[],
+		[selectedCourse],
 	);
-
-	const studentColumns = useMemo<ColumnDef<StudentEntry>[]>(
-		() => [
-			{
-				accessorKey: "rollno",
-				header: "Roll No",
-				cell: ({ row }) => (
-					<span className="font-mono">{row.original.rollno}</span>
-				),
-			},
-			{
-				accessorKey: "name",
-				header: "Name",
-			},
-			{
-				id: "remove",
-				header: "Remove",
-				cell: ({ row }) => (
-					<Button
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-						onClick={() =>
-							handleRemoveFromList(row.original.rollno)
-						}
-					>
-						<X className="w-4 h-4" />
-					</Button>
-				),
-			},
-		],
-		[],
-	);
-
-	// Manual enrollment state
-	const [manualRollno, setManualRollno] = useState("");
-	const [manualName, setManualName] = useState("");
 
 	const handleCourseChange = async (courseId: string) => {
 		const course = courses.find((c) => c.course_id.toString() === courseId);
 		setSelectedCourse(course || null);
 		setEnrollments([]);
-		setFile(null);
 		setStudents([]);
 
 		if (course) {
-			await loadEnrollments(course.course_id);
+			await loadEnrollments(course.offering_id!);
 		}
 	};
 
-	const loadEnrollments = async (courseId: number) => {
+	const loadEnrollments = async (offeringId: number) => {
 		setLoadingEnrollments(true);
 		try {
-			const data = await staffApi.getCourseEnrollments(courseId);
+			const data = await staffApi.getCourseEnrollments(offeringId);
 			setEnrollments(data.enrollments);
 		} catch (error) {
 			toast.error(
@@ -209,78 +171,6 @@ export function StaffEnrollmentView() {
 		} finally {
 			setLoadingEnrollments(false);
 		}
-	};
-
-	const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const selectedFile = e.target.files?.[0];
-		if (!selectedFile) return;
-
-		if (!selectedFile.name.endsWith(".csv")) {
-			toast.error("Please select a CSV file");
-			return;
-		}
-
-		setFile(selectedFile);
-		parseCSV(selectedFile);
-	};
-
-	const parseCSV = (file: File) => {
-		setUploading(true);
-		const reader = new FileReader();
-
-		reader.onload = (e) => {
-			try {
-				const text = e.target?.result as string;
-				const lines = text.split("\n").filter((line) => line.trim());
-
-				// Skip header row if it exists
-				const startIndex = lines[0].toLowerCase().includes("rollno")
-					? 1
-					: 0;
-
-				const parsedStudents: StudentEntry[] = [];
-
-				for (let i = startIndex; i < lines.length; i++) {
-					const line = lines[i].trim();
-					if (!line) continue;
-
-					// Split by comma and handle quoted values
-					const parts = line
-						.split(",")
-						.map((part) => part.trim().replace(/^"|"$/g, ""));
-
-					if (parts.length >= 2) {
-						const rollno = parts[0];
-						const name = parts[1];
-
-						if (rollno && name) {
-							parsedStudents.push({ rollno, name });
-						}
-					}
-				}
-
-				if (parsedStudents.length === 0) {
-					toast.error("No valid student entries found in CSV");
-				} else {
-					setStudents(parsedStudents);
-					toast.success(
-						`Parsed ${parsedStudents.length} students from CSV`,
-					);
-				}
-			} catch (error) {
-				console.error("CSV parsing error:", error);
-				toast.error("Failed to parse CSV file");
-			} finally {
-				setUploading(false);
-			}
-		};
-
-		reader.onerror = () => {
-			toast.error("Failed to read file");
-			setUploading(false);
-		};
-
-		reader.readAsText(file);
 	};
 
 	const handleEnroll = async () => {
@@ -297,7 +187,7 @@ export function StaffEnrollmentView() {
 		setEnrolling(true);
 		try {
 			const result = await staffApi.bulkEnrollStudents(
-				selectedCourse.course_id,
+				selectedCourse.offering_id!,
 				students,
 			);
 
@@ -312,12 +202,8 @@ export function StaffEnrollmentView() {
 			}
 
 			// Reset and reload
-			setFile(null);
 			setStudents([]);
-			if (fileInputRef.current) {
-				fileInputRef.current.value = "";
-			}
-			await loadEnrollments(selectedCourse.course_id);
+			await loadEnrollments(selectedCourse.offering_id!);
 			refreshCourses();
 		} catch (error) {
 			toast.error(
@@ -334,9 +220,12 @@ export function StaffEnrollmentView() {
 		if (!selectedCourse) return;
 
 		try {
-			await staffApi.removeEnrollment(selectedCourse.course_id, rollno);
+			await staffApi.removeEnrollment(
+				selectedCourse.offering_id!,
+				rollno,
+			);
 			toast.success("Student removed from course successfully");
-			await loadEnrollments(selectedCourse.course_id);
+			await loadEnrollments(selectedCourse.offering_id!);
 			refreshCourses();
 		} catch (error) {
 			toast.error(
@@ -347,60 +236,10 @@ export function StaffEnrollmentView() {
 		}
 	};
 
-	const downloadTemplate = () => {
-		const csvContent =
-			"rollno,name\nCS101,John Doe\nCS102,Jane Smith\nCS103,Bob Johnson";
-		const blob = new Blob([csvContent], { type: "text/csv" });
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement("a");
-		link.href = url;
-		link.download = "student_enrollment_template.csv";
-		link.click();
-		URL.revokeObjectURL(url);
-	};
-
-	const clearUpload = () => {
-		setFile(null);
-		setStudents([]);
-		if (fileInputRef.current) {
-			fileInputRef.current.value = "";
-		}
-	};
-
-	// Manual enrollment handlers
-	const handleAddManualStudent = () => {
-		if (!manualRollno.trim()) {
-			toast.error("Please enter a roll number");
-			return;
-		}
-		if (!manualName.trim()) {
-			toast.error("Please enter student name");
-			return;
-		}
-
-		// Check for duplicate
-		if (students.some((s) => s.rollno === manualRollno.trim())) {
-			toast.error("This roll number is already in the list");
-			return;
-		}
-
-		setStudents((prev) => [
-			...prev,
-			{ rollno: manualRollno.trim(), name: manualName.trim() },
-		]);
-		setManualRollno("");
-		setManualName("");
-		toast.success("Student added to enrollment list");
-	};
-
-	const handleRemoveFromList = (rollno: string) => {
-		setStudents((prev) => prev.filter((s) => s.rollno !== rollno));
-	};
-
 	if (isLoading) {
 		return (
 			<div className="flex items-center justify-center h-64">
-				<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+				<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
 			</div>
 		);
 	}
@@ -408,10 +247,11 @@ export function StaffEnrollmentView() {
 	return (
 		<div className="space-y-6">
 			{/* Course Selection */}
-			<Card>
-				<CardHeader>
-					<CardTitle className="flex items-center gap-2">
-						<BookOpen className="w-5 h-5" />
+			<Card className="bg-card/45 backdrop-blur-md border border-muted/50 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 relative group overflow-hidden">
+				<div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-amber-500 via-orange-500 to-transparent" />
+				<CardHeader className="pb-3">
+					<CardTitle className="flex items-center gap-2 text-lg font-bold text-foreground">
+						<BookOpen className="w-5 h-5 text-amber-500" />
 						Select Course
 					</CardTitle>
 				</CardHeader>
@@ -420,19 +260,20 @@ export function StaffEnrollmentView() {
 						value={selectedCourse?.course_id.toString() || ""}
 						onValueChange={handleCourseChange}
 					>
-						<SelectTrigger className="w-full md:w-[400px]">
+						<SelectTrigger className="w-full md:w-[400px] bg-background/60 shadow-inner focus:ring-1 focus:ring-amber-500/30 transition-all rounded-xl border-muted/50 h-10">
 							<SelectValue placeholder="Select a course to manage enrollments" />
 						</SelectTrigger>
-						<SelectContent>
+						<SelectContent className="bg-card/95 backdrop-blur-md border border-muted/50 rounded-xl">
 							{courses.map((course) => (
 								<SelectItem
-									key={course.course_id}
+									key={course.offering_id || course.course_id}
 									value={course.course_id.toString()}
+									className="focus:bg-amber-500/10 focus:text-amber-600 dark:focus:text-amber-400 rounded-lg py-2"
 								>
-									<span className="font-mono mr-2">
+									<span className="font-mono mr-2 font-semibold text-amber-600 dark:text-amber-400">
 										{course.course_code}
 									</span>
-									- {course.course_name}
+									<span className="text-muted-foreground font-medium">- {course.course_name}</span>
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -442,243 +283,71 @@ export function StaffEnrollmentView() {
 
 			{selectedCourse && (
 				<>
-					{/* Enrollment Section with Tabs */}
-					<Card>
-						<CardHeader>
-							<CardTitle className="flex items-center gap-2">
-								<Users className="w-5 h-5" />
+					{/* Enrollment Section */}
+					<Card className="bg-card/45 backdrop-blur-md border border-muted/50 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 relative group overflow-hidden">
+						<div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-amber-500 via-orange-500 to-transparent" />
+						<CardHeader className="pb-3">
+							<CardTitle className="flex items-center gap-2 text-lg font-bold text-foreground">
+								<Users className="w-5 h-5 text-amber-500" />
 								Add Students to Course
 							</CardTitle>
-							<p className="text-sm text-muted-foreground">
+							<p className="text-xs font-medium text-muted-foreground mt-0.5">
 								Enroll students using CSV upload or manual entry
 							</p>
 						</CardHeader>
 						<CardContent>
-							<Tabs defaultValue="csv" className="w-full">
-								<TabsList className="grid w-full grid-cols-2 mb-4">
-									<TabsTrigger
-										value="csv"
-										className="flex items-center gap-2"
-									>
-										<Upload className="w-4 h-4" />
-										CSV Upload
-									</TabsTrigger>
-									<TabsTrigger
-										value="manual"
-										className="flex items-center gap-2"
-									>
-										<UserPlus className="w-4 h-4" />
-										Manual Entry
-									</TabsTrigger>
-								</TabsList>
-
-								{/* CSV Upload Tab */}
-								<TabsContent value="csv" className="space-y-4">
-									<div className="flex items-center justify-between">
-										<div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-4 flex-1">
-											<h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 flex items-center gap-2">
-												<FileText className="w-4 h-4" />
-												CSV Format Requirements
-											</h4>
-											<ul className="text-sm text-blue-700 dark:text-blue-300 mt-2 space-y-1 list-disc list-inside">
-												<li>
-													First row should be headers:
-													rollno,name
-												</li>
-												<li>
-													Each subsequent row should
-													contain:
-													roll_number,student_name
-												</li>
-												<li>Example: CS101,John Doe</li>
-											</ul>
-										</div>
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={downloadTemplate}
-											className="ml-4"
-										>
-											<Download className="w-4 h-4 mr-2" />
-											Template
-										</Button>
-									</div>
-
-									{/* File Upload */}
-									<div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6">
-										<input
-											ref={fileInputRef}
-											type="file"
-											accept=".csv"
-											onChange={handleFileChange}
-											className="hidden"
-											id="csv-upload"
-										/>
-										<label
-											htmlFor="csv-upload"
-											className="flex flex-col items-center cursor-pointer"
-										>
-											<Upload className="w-10 h-10 text-gray-400 mb-2" />
-											<span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-												{file
-													? file.name
-													: "Click to upload CSV file"}
-											</span>
-											<span className="text-xs text-gray-500 mt-1">
-												or drag and drop
-											</span>
-										</label>
-									</div>
-								</TabsContent>
-
-								{/* Manual Entry Tab */}
-								<TabsContent
-									value="manual"
-									className="space-y-4"
-								>
-									<div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-4">
-										<h4 className="text-sm font-medium text-green-900 dark:text-green-100 flex items-center gap-2">
-											<UserPlus className="w-4 h-4" />
-											Manual Student Entry
-										</h4>
-										<p className="text-sm text-green-700 dark:text-green-300 mt-1">
-											Add students one by one to the
-											enrollment list
-										</p>
-									</div>
-
-									<div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 items-end">
-										<div className="space-y-2">
-											<Label htmlFor="rollno">
-												Roll Number
-											</Label>
-											<Input
-												id="rollno"
-												placeholder="e.g., CS101"
-												value={manualRollno}
-												onChange={(e) =>
-													setManualRollno(
-														e.target.value,
-													)
-												}
-												onKeyDown={(e) => {
-													if (e.key === "Enter") {
-														e.preventDefault();
-														document
-															.getElementById(
-																"studentName",
-															)
-															?.focus();
-													}
-												}}
-											/>
-										</div>
-										<div className="space-y-2">
-											<Label htmlFor="studentName">
-												Student Name
-											</Label>
-											<Input
-												id="studentName"
-												placeholder="e.g., John Doe"
-												value={manualName}
-												onChange={(e) =>
-													setManualName(
-														e.target.value,
-													)
-												}
-												onKeyDown={(e) => {
-													if (e.key === "Enter") {
-														e.preventDefault();
-														handleAddManualStudent();
-													}
-												}}
-											/>
-										</div>
-										<Button
-											onClick={handleAddManualStudent}
-											className="h-10"
-										>
-											<UserPlus className="w-4 h-4 mr-2" />
-											Add
-										</Button>
-									</div>
-								</TabsContent>
-							</Tabs>
-
-							{/* Preview Table - Shows for both tabs */}
+							<div className="mb-4">
+								<StaffStudentUpload
+									course={selectedCourse}
+									onStudentsChange={setStudents}
+								/>
+							</div>
 							{students.length > 0 && (
-								<div className="space-y-4 mt-6 pt-6 border-t">
-									<div className="flex items-center justify-between">
-										<div className="flex items-center gap-2">
-											<CheckCircle2 className="w-5 h-5 text-green-500" />
-											<span className="font-medium">
-												{students.length} students ready
-												to enroll
-											</span>
+								<Button
+									onClick={handleEnroll}
+									disabled={enrolling}
+									className="w-full mt-4 h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-xl active:scale-95 duration-200 transition-all border border-orange-500/30 shadow-md shadow-orange-500/10"
+								>
+									{enrolling ? (
+										<div className="flex items-center justify-center gap-2">
+											<div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+											<span>Enrolling Students...</span>
 										</div>
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={clearUpload}
-										>
-											Clear All
-										</Button>
-									</div>
-
-									<div className="max-h-64 overflow-y-auto rounded-md border">
-										<DataTable
-											columns={studentColumns}
-											data={students}
-										/>
-									</div>
-
-									<Button
-										onClick={handleEnroll}
-										disabled={enrolling}
-										className="w-full"
-									>
-										{enrolling ? (
-											<>
-												<span className="animate-spin mr-2">
-													⏳
-												</span>
-												Enrolling...
-											</>
-										) : (
-											<>
-												<Users className="w-4 h-4 mr-2" />
-												Enroll {students.length}{" "}
-												Students
-											</>
-										)}
-									</Button>
-								</div>
+									) : (
+										<div className="flex items-center justify-center gap-2">
+											<Users className="w-4 h-4" />
+											<span>Enroll {students.length} Students</span>
+										</div>
+									)}
+								</Button>
 							)}
 						</CardContent>
 					</Card>
 
 					{/* Current Enrollments */}
-					<Card>
-						<CardHeader>
+					<Card className="bg-card/45 backdrop-blur-md border border-muted/50 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 relative group overflow-hidden">
+						<div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-amber-500 via-orange-500 to-transparent" />
+						<CardHeader className="pb-3 border-b border-muted/20">
 							<div className="flex items-center justify-between">
-								<div>
-									<CardTitle className="flex items-center gap-2">
-										<Users className="w-5 h-5" />
+								<div className="space-y-1">
+									<CardTitle className="flex items-center gap-2 text-lg font-bold text-foreground">
+										<Users className="w-5 h-5 text-amber-500" />
 										Current Enrollments
 									</CardTitle>
-									<p className="text-sm text-muted-foreground mt-1">
+									<p className="text-xs font-medium text-muted-foreground">
 										Students enrolled in{" "}
-										{selectedCourse.course_code} -{" "}
-										{selectedCourse.course_name}
+										<span className="font-semibold font-mono text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+											{selectedCourse.course_code}
+										</span>
+										{" "}- {selectedCourse.course_name}
 									</p>
 								</div>
-								<Badge variant="secondary">
-									{enrollments.length} Student
-									{enrollments.length !== 1 ? "s" : ""}
+								<Badge className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shadow-sm font-semibold rounded-lg">
+									{enrollments.length} Student{enrollments.length !== 1 ? "s" : ""}
 								</Badge>
 							</div>
 						</CardHeader>
-						<CardContent>
+						<CardContent className="pt-4">
 							<DataTable
 								columns={enrollmentColumns}
 								data={enrollments}
@@ -690,15 +359,15 @@ export function StaffEnrollmentView() {
 			)}
 
 			{!selectedCourse && (
-				<Card>
-					<CardContent className="flex flex-col items-center justify-center py-12">
-						<BookOpen className="w-12 h-12 text-gray-400 mb-4" />
-						<h3 className="text-lg font-medium text-gray-900 dark:text-white">
+				<Card className="bg-card/45 backdrop-blur-md border border-muted/50 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 relative group overflow-hidden">
+					<div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-amber-500 via-orange-500 to-transparent" />
+					<CardContent className="flex flex-col items-center justify-center py-16">
+						<BookOpen className="w-12 h-12 text-amber-500/40 mb-4 animate-pulse" />
+						<h3 className="text-lg font-bold text-foreground">
 							Select a Course
 						</h3>
-						<p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-							Choose a course from the dropdown above to manage
-							student enrollments
+						<p className="text-xs font-medium text-muted-foreground mt-2 max-w-sm text-center leading-relaxed">
+							Choose a course from the dropdown above to manage student enrollments, upload CSV cohorts, or update manual lists
 						</p>
 					</CardContent>
 				</Card>

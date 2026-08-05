@@ -1,9 +1,12 @@
 import type ExcelJS from "exceljs";
 import type { StudentMarksData, COMarks } from "./types";
+import { styleCell, mergeAndStyle } from "./excelUtils";
 
 interface COStats {
 	above70: number;
 	abovePass: number;
+	sumPercentage: number;
+	averagePercentage: number;
 }
 
 interface AttainmentCalculation {
@@ -11,12 +14,7 @@ interface AttainmentCalculation {
 	absentees: number;
 	presentStudents: number;
 	coStats: {
-		CO1: COStats;
-		CO2: COStats;
-		CO3: COStats;
-		CO4: COStats;
-		CO5: COStats;
-		CO6: COStats;
+		[coName: string]: COStats;
 	};
 }
 
@@ -30,7 +28,7 @@ interface AttainmentThreshold {
  */
 function isCOAssessed(co: string, coMaxMarks?: COMarks): boolean {
 	if (!coMaxMarks) return true; // Default to assessed if no data provided
-	return (coMaxMarks[co as keyof COMarks] || 0) > 0;
+	return (coMaxMarks[co] || 0) > 0;
 }
 
 /**
@@ -39,19 +37,16 @@ function isCOAssessed(co: string, coMaxMarks?: COMarks): boolean {
 function calculateCOAttainment(
 	studentsData: StudentMarksData[],
 	passingThreshold: number,
-	coThreshold: number
+	coThreshold: number,
+	coNames: string[]
 ): AttainmentCalculation {
 	const totalStudents = studentsData.length;
 	let absentees = 0;
 
-	const coStats = {
-		CO1: { above70: 0, abovePass: 0 },
-		CO2: { above70: 0, abovePass: 0 },
-		CO3: { above70: 0, abovePass: 0 },
-		CO4: { above70: 0, abovePass: 0 },
-		CO5: { above70: 0, abovePass: 0 },
-		CO6: { above70: 0, abovePass: 0 },
-	};
+	const coStats: Record<string, COStats> = {};
+	coNames.forEach((coName) => {
+		coStats[coName] = { above70: 0, abovePass: 0, sumPercentage: 0, averagePercentage: 0 };
+	});
 
 	studentsData.forEach((student) => {
 		if (student.absentee === "AB" || student.absentee === "UR") {
@@ -59,14 +54,25 @@ function calculateCOAttainment(
 			return;
 		}
 
-		(["CO1", "CO2", "CO3", "CO4", "CO5", "CO6"] as const).forEach((co) => {
-			const percentage = student.coTotals[co];
+		coNames.forEach((co) => {
+			const percentage = student.coTotals[co] || 0;
+			const roundedPercentage = Math.round(percentage * 100) / 100;
 			if (percentage >= coThreshold) coStats[co].above70++;
 			if (percentage >= passingThreshold) coStats[co].abovePass++;
+			coStats[co].sumPercentage += roundedPercentage;
 		});
 	});
 
 	const presentStudents = totalStudents - absentees;
+	
+	// Calculate average percentage for each CO
+	coNames.forEach((co) => {
+		if (presentStudents > 0) {
+			coStats[co].averagePercentage = 
+				Math.round((coStats[co].sumPercentage / presentStudents) * 100) / 100;
+		}
+	});
+	
 	return { totalStudents, absentees, presentStudents, coStats };
 }
 
@@ -77,13 +83,21 @@ function getAttainmentLevel(
 	percentage: number,
 	thresholds: AttainmentThreshold[]
 ): number {
-	const sortedThresholds = [...thresholds].sort(
+	const sorted = [...thresholds].sort(
 		(a, b) => b.percentage - a.percentage
 	);
 
-	for (let i = 0; i < sortedThresholds.length; i++) {
-		if (percentage >= sortedThresholds[i].percentage) {
-			return sortedThresholds.length - i;
+	if (sorted.length === 0) return 0;
+	if (percentage >= sorted[0].percentage) return sorted.length;
+
+	for (let i = 1; i < sorted.length; i++) {
+		if (percentage >= sorted[i].percentage) {
+			const baseLevel = sorted.length - i;
+			const basePct = sorted[i].percentage;
+			const nextPct = sorted[i - 1].percentage;
+			const diff = nextPct - basePct;
+			if (diff === 0) return baseLevel;
+			return baseLevel + (percentage - basePct) / diff;
 		}
 	}
 
@@ -100,9 +114,10 @@ function getPercentageColor(
 	const level = getAttainmentLevel(percentage, thresholds);
 	const maxLevel = thresholds.length;
 
-	if (level === maxLevel) return "FFAAFFAA"; // Light green
-	if (level === maxLevel - 1) return "FFFFFFAA"; // Light yellow
-	if (level === maxLevel - 2) return "FFFFCCAA"; // Light orange
+	const flooredLevel = Math.floor(level);
+	if (flooredLevel === maxLevel) return "FFAAFFAA"; // Light green
+	if (flooredLevel === maxLevel - 1) return "FFFFFFAA"; // Light yellow
+	if (flooredLevel === maxLevel - 2) return "FFFFCCAA"; // Light orange
 	return "FFFFAAAA"; // Light red
 }
 
@@ -116,320 +131,199 @@ export function createCOAttainmentPointScaleTable(
 	passingThreshold: number,
 	coThreshold: number,
 	attainmentThresholds: AttainmentThreshold[],
-	coMaxMarks?: COMarks
+	coMaxMarks: COMarks,
+	coNames: string[],
+	coStartCol: number
 ): number {
 	const attainment = calculateCOAttainment(
 		studentsData,
 		passingThreshold,
-		coThreshold
+		coThreshold,
+		coNames
 	);
-	const coList = ["CO1", "CO2", "CO3", "CO4", "CO5", "CO6"];
 
 	let currentRow = startRow;
+	const numCOs = coNames.length;
+	const totalCols = coStartCol + numCOs - 1;
 
 	// Title row
-	const titleCell = ws.getCell(currentRow, 1);
-	titleCell.value = "CO ATTAINMENT in 3.0 POINT Scale";
-	titleCell.font = { bold: true, size: 14 };
-	titleCell.alignment = { horizontal: "center", vertical: "middle" };
-	titleCell.fill = {
-		type: "pattern",
-		pattern: "solid",
-		fgColor: { argb: "FFFFC0CB" }, // Pink
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 10);
+	mergeAndStyle(ws, currentRow, 1, currentRow, totalCols, {
+		value: `CO ATTAINMENT in ${attainmentThresholds.length}.0 POINT Scale`,
+		bold: true,
+		size: 14,
+		align: "center",
+		fillColor: "FFFFC0CB", // Pink
+	});
 	currentRow++;
 
 	// Header row 1
-	const header1Cell = ws.getCell(currentRow, 1);
-	header1Cell.value = "ATTAINMENT TABLE";
-	header1Cell.font = { bold: true };
-	header1Cell.alignment = { horizontal: "center", vertical: "middle" };
-	header1Cell.fill = {
-		type: "pattern",
-		pattern: "solid",
-		fgColor: { argb: "FFFFFF00" }, // Yellow
-	};
-	header1Cell.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 4);
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "ATTAINMENT TABLE",
+		bold: true,
+		align: "center",
+		fillColor: "FFFFFF00", // Yellow
+	});
 
-	const header1Span = ws.getCell(currentRow, 5);
-	header1Span.value = "CO1 to CO6";
-	header1Span.font = { bold: true };
-	header1Span.alignment = { horizontal: "center", vertical: "middle" };
-	header1Span.fill = {
-		type: "pattern",
-		pattern: "solid",
-		fgColor: { argb: "FFADD8E6" }, // Light blue
-	};
-	header1Span.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 5, currentRow, 10);
+	mergeAndStyle(ws, currentRow, coStartCol, currentRow, totalCols, {
+		value: `${coNames[0]} to ${coNames[numCOs - 1]}`,
+		bold: true,
+		align: "center",
+		fillColor: "FFADD8E6", // Light blue
+	});
 	currentRow++;
 
 	// Header row 2 - CO columns
-	coList.forEach((co, idx) => {
-		const cell = ws.getCell(currentRow, idx + 5);
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
 		cell.value = co;
-		cell.font = { bold: true };
-		cell.alignment = { horizontal: "center", vertical: "middle" };
-		cell.fill = {
-			type: "pattern",
-			pattern: "solid",
-			fgColor: { argb: "FFD3D3D3" }, // Light gray
-		};
-		cell.border = {
-			top: { style: "thin" },
-			left: { style: "thin" },
-			bottom: { style: "thin" },
-			right: { style: "thin" },
-		};
+		styleCell(cell, {
+			bold: true,
+			align: "center",
+			fillColor: "FFD3D3D3",
+		});
 	});
 	currentRow++;
 
 	// Row 1: ABSENTEE+NOT ATTEMPT
-	const absenteeCell = ws.getCell(currentRow, 1);
-	absenteeCell.value = "ABSENTEE+NOT ATTEMPT";
-	absenteeCell.font = { bold: true };
-	absenteeCell.alignment = { horizontal: "left", vertical: "middle" };
-	absenteeCell.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 4);
-	coList.forEach((_, idx) => {
-		const cell = ws.getCell(currentRow, idx + 5);
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "ABSENTEE+NOT ATTEMPT",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((_, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
 		cell.value = attainment.absentees;
-		cell.alignment = { horizontal: "center" };
-		cell.border = {
-			top: { style: "thin" },
-			left: { style: "thin" },
-			bottom: { style: "thin" },
-			right: { style: "thin" },
-		};
+		styleCell(cell, { align: "center" });
 	});
 	currentRow++;
 
 	// Row 2: PRESENT STUDENT OR ATTEMPT
-	const presentCell = ws.getCell(currentRow, 1);
-	presentCell.value = "PRESENT STUDENT OR ATTEMPT";
-	presentCell.font = { bold: true };
-	presentCell.alignment = { horizontal: "left", vertical: "middle" };
-	presentCell.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 4);
-	coList.forEach((_, idx) => {
-		const cell = ws.getCell(currentRow, idx + 5);
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "PRESENT STUDENT OR ATTEMPT",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((_, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
 		cell.value = attainment.presentStudents;
-		cell.alignment = { horizontal: "center" };
-		cell.border = {
-			top: { style: "thin" },
-			left: { style: "thin" },
-			bottom: { style: "thin" },
-			right: { style: "thin" },
-		};
+		styleCell(cell, { align: "center" });
 	});
 	currentRow++;
 
-	// Row 3: NO. OF STUDENTS SECURE MARKS > THRESHOLD % FOR CO ATTAINMENT
-	const thresholdCountCell = ws.getCell(currentRow, 1);
-	thresholdCountCell.value =
-		"NO. OF STUDENTS SECURE MARKS > THRESHOLD % FOR CO ATTAINMENT";
-	thresholdCountCell.font = { bold: true };
-	thresholdCountCell.alignment = { horizontal: "left", vertical: "middle" };
-	thresholdCountCell.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 4);
-	coList.forEach((co, idx) => {
-		const cell = ws.getCell(currentRow, idx + 5);
+	// Row 3: SECURED > THRESHOLD
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "NO. OF STUDENTS SECURE MARKS > THRESHOLD % FOR CO ATTAINMENT",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
 		const assessed = isCOAssessed(co, coMaxMarks);
-		cell.value = assessed
-			? attainment.coStats[co as keyof typeof attainment.coStats].above70
-			: "NA";
-		cell.alignment = { horizontal: "center" };
-		cell.fill = {
-			type: "pattern",
-			pattern: "solid",
-			fgColor: { argb: assessed ? "FF404040" : "FFD3D3D3" }, // Dark gray or light gray for NA
-		};
-		cell.font = { color: { argb: assessed ? "FFFFFFFF" : "FF808080" } }; // White or gray text
-		cell.border = {
-			top: { style: "thin" },
-			left: { style: "thin" },
-			bottom: { style: "thin" },
-			right: { style: "thin" },
-		};
+		cell.value = assessed ? attainment.coStats[co].above70 : "NA";
+		styleCell(cell, {
+			align: "center",
+			fillColor: assessed ? "FF404040" : "FFD3D3D3",
+			color: assessed ? "FFFFFFFF" : "FF808080",
+			bold: !assessed,
+		});
 	});
 	currentRow++;
 
-	// Row 4: PC. OF STUDENTS SECURE MARKS > THRESHOLD % FOR CO ATTAINMENT
-	const thresholdPctCell = ws.getCell(currentRow, 1);
-	thresholdPctCell.value =
-		"PC. OF STUDENTS SECURE MARKS > THRESHOLD % FOR CO ATTAINMENT";
-	thresholdPctCell.font = { bold: true };
-	thresholdPctCell.alignment = { horizontal: "left", vertical: "middle" };
-	thresholdPctCell.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 4);
-	coList.forEach((co, idx) => {
-		const cell = ws.getCell(currentRow, idx + 5);
+	// Row 4: PC. OF STUDENTS
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "PC. OF STUDENTS SECURE MARKS > THRESHOLD % FOR CO ATTAINMENT",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
 		const assessed = isCOAssessed(co, coMaxMarks);
 		if (assessed) {
 			const percentage =
 				attainment.presentStudents > 0
-					? (attainment.coStats[co as keyof typeof attainment.coStats]
-							.above70 /
-							attainment.presentStudents) *
-					  100
+					? (attainment.coStats[co].above70 / attainment.presentStudents) * 100
 					: 0;
 			cell.value = Number(percentage.toFixed(2));
+			styleCell(cell, { align: "center" });
 		} else {
 			cell.value = "NA";
-			cell.font = { color: { argb: "FF808080" } };
+			styleCell(cell, {
+				align: "center",
+				color: "FF808080",
+				bold: true,
+			});
 		}
-		cell.alignment = { horizontal: "center" };
-		cell.border = {
-			top: { style: "thin" },
-			left: { style: "thin" },
-			bottom: { style: "thin" },
-			right: { style: "thin" },
-		};
 	});
 	currentRow++;
 
-	// Row 5: CO Attainment Level (Based on Criteria)
-	const attainmentLevelCell = ws.getCell(currentRow, 1);
-	attainmentLevelCell.value = "CO Attainment Level (Based on Criteria)";
-	attainmentLevelCell.font = { bold: true };
-	attainmentLevelCell.alignment = { horizontal: "left", vertical: "middle" };
-	attainmentLevelCell.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 4);
-	coList.forEach((co, idx) => {
-		const cell = ws.getCell(currentRow, idx + 5);
+	// Row 5: Attainment Level (Based on Criteria)
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "CO Attainment Level (Based on Criteria)",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
 		const assessed = isCOAssessed(co, coMaxMarks);
 		if (assessed) {
 			const percentage =
 				attainment.presentStudents > 0
-					? (attainment.coStats[co as keyof typeof attainment.coStats]
-							.above70 /
-							attainment.presentStudents) *
-					  100
+					? (attainment.coStats[co].above70 / attainment.presentStudents) * 100
 					: 0;
 			const level = getAttainmentLevel(percentage, attainmentThresholds);
 			cell.value = Number(level.toFixed(2));
-			cell.fill = {
-				type: "pattern",
-				pattern: "solid",
-				fgColor: {
-					argb: getPercentageColor(percentage, attainmentThresholds),
-				},
-			};
+			styleCell(cell, {
+				bold: true,
+				align: "center",
+				fillColor: getPercentageColor(percentage, attainmentThresholds),
+			});
 		} else {
 			cell.value = "NA";
-			cell.fill = {
-				type: "pattern",
-				pattern: "solid",
-				fgColor: { argb: "FFD3D3D3" }, // Light gray for NA
-			};
-			cell.font = { bold: true, color: { argb: "FF808080" } };
+			styleCell(cell, {
+				bold: true,
+				align: "center",
+				fillColor: "FFD3D3D3",
+				color: "FF808080",
+			});
 		}
-		cell.alignment = { horizontal: "center" };
-		cell.font = { bold: true };
-		cell.border = {
-			top: { style: "thin" },
-			left: { style: "thin" },
-			bottom: { style: "thin" },
-			right: { style: "thin" },
-		};
 	});
 	currentRow++;
 
 	// Row 6: Final attainment level CO (by Direct Assessment)
-	const finalDirectCell = ws.getCell(currentRow, 1);
-	finalDirectCell.value = "Final attainment level CO (by Direct Assessment):";
-	finalDirectCell.font = { bold: true };
-	finalDirectCell.alignment = { horizontal: "left", vertical: "middle" };
-	finalDirectCell.fill = {
-		type: "pattern",
-		pattern: "solid",
-		fgColor: { argb: "FFFFA500" }, // Orange
-	};
-	finalDirectCell.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 4);
-	coList.forEach((co, idx) => {
-		const cell = ws.getCell(currentRow, idx + 5);
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "Final attainment level CO (by Direct Assessment):",
+		bold: true,
+		align: "left",
+		fillColor: "FFFFA500", // Orange
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
 		const assessed = isCOAssessed(co, coMaxMarks);
 		if (assessed) {
 			const percentage =
 				attainment.presentStudents > 0
-					? (attainment.coStats[co as keyof typeof attainment.coStats]
-							.above70 /
-							attainment.presentStudents) *
-					  100
+					? (attainment.coStats[co].above70 / attainment.presentStudents) * 100
 					: 0;
 			const level = getAttainmentLevel(percentage, attainmentThresholds);
-			cell.value = level;
-			cell.fill = {
-				type: "pattern",
-				pattern: "solid",
-				fgColor: {
-					argb: getPercentageColor(percentage, attainmentThresholds),
-				},
-			};
+			cell.value = Number(level.toFixed(2));
+			styleCell(cell, {
+				bold: true,
+				align: "center",
+				fillColor: getPercentageColor(percentage, attainmentThresholds),
+			});
 		} else {
 			cell.value = "NA";
-			cell.fill = {
-				type: "pattern",
-				pattern: "solid",
-				fgColor: { argb: "FFD3D3D3" }, // Light gray for NA
-			};
-			cell.font = { bold: true, color: { argb: "FF808080" } };
+			styleCell(cell, {
+				bold: true,
+				align: "center",
+				fillColor: "FFD3D3D3",
+				color: "FF808080",
+			});
 		}
-		cell.alignment = { horizontal: "center" };
-		cell.font = { bold: true };
-		cell.border = {
-			top: { style: "thin" },
-			left: { style: "thin" },
-			bottom: { style: "thin" },
-			right: { style: "thin" },
-		};
 	});
 	currentRow++;
 
-	return currentRow; // Return next available row
+	return currentRow;
 }
 
 /**
@@ -442,316 +336,525 @@ export function createCOAttainmentAbsoluteScaleTable(
 	passingThreshold: number,
 	coThreshold: number,
 	attainmentThresholds: AttainmentThreshold[],
-	coMaxMarks?: COMarks
+	coMaxMarks: COMarks,
+	coNames: string[],
+	coStartCol: number
 ): number {
 	const attainment = calculateCOAttainment(
 		studentsData,
 		passingThreshold,
-		coThreshold
+		coThreshold,
+		coNames
 	);
-	const coList = ["CO1", "CO2", "CO3", "CO4", "CO5", "CO6"];
 
 	let currentRow = startRow;
+	const numCOs = coNames.length;
+	const totalCols = coStartCol + numCOs - 1;
 
 	// Title row
-	const titleCell = ws.getCell(currentRow, 1);
-	titleCell.value = "CO ATTAINMENT in ABSOLUTE Scale";
-	titleCell.font = { bold: true, size: 14 };
-	titleCell.alignment = { horizontal: "center", vertical: "middle" };
-	titleCell.fill = {
-		type: "pattern",
-		pattern: "solid",
-		fgColor: { argb: "FFFFC0CB" }, // Pink
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 10);
+	mergeAndStyle(ws, currentRow, 1, currentRow, totalCols, {
+		value: "CO ATTAINMENT in ABSOLUTE Scale",
+		bold: true,
+		size: 14,
+		align: "center",
+		fillColor: "FFFFC0CB", // Pink
+	});
 	currentRow++;
 
 	// Header row 1
-	const header1Cell = ws.getCell(currentRow, 1);
-	header1Cell.value = "ATTAINMENT TABLE";
-	header1Cell.font = { bold: true };
-	header1Cell.alignment = { horizontal: "center", vertical: "middle" };
-	header1Cell.fill = {
-		type: "pattern",
-		pattern: "solid",
-		fgColor: { argb: "FFFFFF00" }, // Yellow
-	};
-	header1Cell.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 4);
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "ATTAINMENT TABLE",
+		bold: true,
+		align: "center",
+		fillColor: "FFFFFF00", // Yellow
+	});
 
-	const header1Span = ws.getCell(currentRow, 5);
-	header1Span.value = "CO1 to CO6";
-	header1Span.font = { bold: true };
-	header1Span.alignment = { horizontal: "center", vertical: "middle" };
-	header1Span.fill = {
-		type: "pattern",
-		pattern: "solid",
-		fgColor: { argb: "FFADD8E6" }, // Light blue
-	};
-	header1Span.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 5, currentRow, 10);
+	mergeAndStyle(ws, currentRow, coStartCol, currentRow, totalCols, {
+		value: `${coNames[0]} to ${coNames[numCOs - 1]}`,
+		bold: true,
+		align: "center",
+		fillColor: "FFADD8E6", // Light blue
+	});
 	currentRow++;
 
 	// Header row 2 - CO columns
-	coList.forEach((co, idx) => {
-		const cell = ws.getCell(currentRow, idx + 5);
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
 		cell.value = co;
-		cell.font = { bold: true };
-		cell.alignment = { horizontal: "center", vertical: "middle" };
-		cell.fill = {
-			type: "pattern",
-			pattern: "solid",
-			fgColor: { argb: "FFD3D3D3" }, // Light gray
-		};
-		cell.border = {
-			top: { style: "thin" },
-			left: { style: "thin" },
-			bottom: { style: "thin" },
-			right: { style: "thin" },
-		};
+		styleCell(cell, {
+			bold: true,
+			align: "center",
+			fillColor: "FFD3D3D3",
+		});
 	});
 	currentRow++;
 
 	// Row 1: ABSENTEE+NOT ATTEMPT
-	const absenteeCell = ws.getCell(currentRow, 1);
-	absenteeCell.value = "ABSENTEE+NOT ATTEMPT";
-	absenteeCell.font = { bold: true };
-	absenteeCell.alignment = { horizontal: "left", vertical: "middle" };
-	absenteeCell.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 4);
-	coList.forEach((_, idx) => {
-		const cell = ws.getCell(currentRow, idx + 5);
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "ABSENTEE+NOT ATTEMPT",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((_, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
 		cell.value = attainment.absentees;
-		cell.alignment = { horizontal: "center" };
-		cell.border = {
-			top: { style: "thin" },
-			left: { style: "thin" },
-			bottom: { style: "thin" },
-			right: { style: "thin" },
-		};
+		styleCell(cell, { align: "center" });
 	});
 	currentRow++;
 
 	// Row 2: PRESENT STUDENT OR ATTEMPT
-	const presentCell = ws.getCell(currentRow, 1);
-	presentCell.value = "PRESENT STUDENT OR ATTEMPT";
-	presentCell.font = { bold: true };
-	presentCell.alignment = { horizontal: "left", vertical: "middle" };
-	presentCell.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 4);
-	coList.forEach((_, idx) => {
-		const cell = ws.getCell(currentRow, idx + 5);
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "PRESENT STUDENT OR ATTEMPT",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((_, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
 		cell.value = attainment.presentStudents;
-		cell.alignment = { horizontal: "center" };
-		cell.border = {
-			top: { style: "thin" },
-			left: { style: "thin" },
-			bottom: { style: "thin" },
-			right: { style: "thin" },
-		};
+		styleCell(cell, { align: "center" });
 	});
 	currentRow++;
 
 	// Row 3: NO. OF STUDENTS SECURE MARKS > PASSING MARKS
-	const passingCountCell = ws.getCell(currentRow, 1);
-	passingCountCell.value = "NO. OF STUDENTS SECURE MARKS > PASSING MARKS";
-	passingCountCell.font = { bold: true };
-	passingCountCell.alignment = { horizontal: "left", vertical: "middle" };
-	passingCountCell.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 4);
-	coList.forEach((co, idx) => {
-		const cell = ws.getCell(currentRow, idx + 5);
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "NO. OF STUDENTS SECURE MARKS > PASSING MARKS",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
 		const assessed = isCOAssessed(co, coMaxMarks);
-		cell.value = assessed
-			? attainment.coStats[co as keyof typeof attainment.coStats]
-					.abovePass
-			: "NA";
-		cell.alignment = { horizontal: "center" };
-		cell.fill = {
-			type: "pattern",
-			pattern: "solid",
-			fgColor: { argb: assessed ? "FF505050" : "FFD3D3D3" }, // Dark gray or light gray for NA
-		};
-		cell.font = { color: { argb: assessed ? "FFFFFFFF" : "FF808080" } }; // White or gray text
-		cell.border = {
-			top: { style: "thin" },
-			left: { style: "thin" },
-			bottom: { style: "thin" },
-			right: { style: "thin" },
-		};
+		cell.value = assessed ? attainment.coStats[co].abovePass : "NA";
+		styleCell(cell, {
+			align: "center",
+			fillColor: assessed ? "FF505050" : "FFD3D3D3",
+			color: assessed ? "FFFFFFFF" : "FF808080",
+			bold: !assessed,
+		});
 	});
 	currentRow++;
 
 	// Row 4: % of Students Above Passing Marks
-	const passingPctCell = ws.getCell(currentRow, 1);
-	passingPctCell.value = "% of Students Above Passing Marks";
-	passingPctCell.font = { bold: true };
-	passingPctCell.alignment = { horizontal: "left", vertical: "middle" };
-	passingPctCell.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 4);
-	coList.forEach((co, idx) => {
-		const cell = ws.getCell(currentRow, idx + 5);
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "% of Students Above Passing Marks",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
 		const assessed = isCOAssessed(co, coMaxMarks);
 		if (assessed) {
 			const percentage =
 				attainment.presentStudents > 0
-					? (attainment.coStats[co as keyof typeof attainment.coStats]
-							.abovePass /
-							attainment.presentStudents) *
-					  100
+					? (attainment.coStats[co].abovePass / attainment.presentStudents) * 100
 					: 0;
 			cell.value = Number(percentage.toFixed(2));
+			styleCell(cell, { align: "center" });
 		} else {
 			cell.value = "NA";
-			cell.font = { color: { argb: "FF808080" } };
+			styleCell(cell, {
+				align: "center",
+				color: "FF808080",
+				bold: true,
+			});
 		}
-		cell.alignment = { horizontal: "center" };
-		cell.border = {
-			top: { style: "thin" },
-			left: { style: "thin" },
-			bottom: { style: "thin" },
-			right: { style: "thin" },
-		};
 	});
 	currentRow++;
 
-	// Row 5: CO Attainment (% of Students Above Passing Marks)
-	const avgAttainmentCell = ws.getCell(currentRow, 1);
-	avgAttainmentCell.value =
-		"CO Attainment (% of Students Above Passing Marks)";
-	avgAttainmentCell.font = { bold: true };
-	avgAttainmentCell.alignment = { horizontal: "left", vertical: "middle" };
-	avgAttainmentCell.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 4);
-	coList.forEach((co, idx) => {
-		const cell = ws.getCell(currentRow, idx + 5);
+	// Row 5: CO Attainment (AVERAGE OF PERCENTAGE ATTAINMENTS)
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "CO Attainment (AVERAGE OF PERCENTAGE ATTAINMENTS)",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
 		const assessed = isCOAssessed(co, coMaxMarks);
 		if (assessed) {
-			const percentage =
-				attainment.presentStudents > 0
-					? (attainment.coStats[co as keyof typeof attainment.coStats]
-							.abovePass /
-							attainment.presentStudents) *
-					  100
-					: 0;
+			const percentage = attainment.coStats[co].averagePercentage || 0;
 			cell.value = Number(percentage.toFixed(2));
-			cell.fill = {
-				type: "pattern",
-				pattern: "solid",
-				fgColor: {
-					argb: getPercentageColor(percentage, attainmentThresholds),
-				},
-			};
+			styleCell(cell, {
+				bold: true,
+				align: "center",
+				fillColor: getPercentageColor(percentage, attainmentThresholds),
+			});
 		} else {
 			cell.value = "NA";
-			cell.fill = {
-				type: "pattern",
-				pattern: "solid",
-				fgColor: { argb: "FFD3D3D3" }, // Light gray for NA
-			};
-			cell.font = { bold: true, color: { argb: "FF808080" } };
+			styleCell(cell, {
+				bold: true,
+				align: "center",
+				fillColor: "FFD3D3D3",
+				color: "FF808080",
+			});
 		}
-		cell.alignment = { horizontal: "center" };
-		cell.font = { bold: true };
-		cell.border = {
-			top: { style: "thin" },
-			left: { style: "thin" },
-			bottom: { style: "thin" },
-			right: { style: "thin" },
-		};
 	});
 	currentRow++;
 
 	// Row 6: Final attainment level CO (IN ABSOLUTE SCALE)
-	const finalAbsoluteCell = ws.getCell(currentRow, 1);
-	finalAbsoluteCell.value = "Final attainment level CO (IN ABSOLUTE SCALE):";
-	finalAbsoluteCell.font = { bold: true };
-	finalAbsoluteCell.alignment = { horizontal: "left", vertical: "middle" };
-	finalAbsoluteCell.fill = {
-		type: "pattern",
-		pattern: "solid",
-		fgColor: { argb: "FFFFA500" }, // Orange
-	};
-	finalAbsoluteCell.border = {
-		top: { style: "thin" },
-		left: { style: "thin" },
-		bottom: { style: "thin" },
-		right: { style: "thin" },
-	};
-	ws.mergeCells(currentRow, 1, currentRow, 4);
-	coList.forEach((co, idx) => {
-		const cell = ws.getCell(currentRow, idx + 5);
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "Final attainment level CO (IN ABSOLUTE SCALE):",
+		bold: true,
+		align: "left",
+		fillColor: "FFFFA500", // Orange
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
 		const assessed = isCOAssessed(co, coMaxMarks);
 		if (assessed) {
-			const percentage =
-				attainment.presentStudents > 0
-					? (attainment.coStats[co as keyof typeof attainment.coStats]
-							.abovePass /
-							attainment.presentStudents) *
-					  100
-					: 0;
-			cell.value = Number(percentage.toFixed(2));
-			cell.fill = {
-				type: "pattern",
-				pattern: "solid",
-				fgColor: {
-					argb: getPercentageColor(percentage, attainmentThresholds),
-				},
-			};
+			const percentage = attainment.coStats[co].averagePercentage || 0;
+			cell.value = Number(percentage.toFixed(2)) + "%";
+			styleCell(cell, {
+				bold: true,
+				align: "center",
+				fillColor: getPercentageColor(percentage, attainmentThresholds),
+			});
 		} else {
 			cell.value = "NA";
-			cell.fill = {
-				type: "pattern",
-				pattern: "solid",
-				fgColor: { argb: "FFD3D3D3" }, // Light gray for NA
-			};
-			cell.font = { bold: true, color: { argb: "FF808080" } };
+			styleCell(cell, {
+				bold: true,
+				align: "center",
+				fillColor: "FFD3D3D3",
+				color: "FF808080",
+			});
 		}
-		cell.alignment = { horizontal: "center" };
-		cell.font = { bold: true };
-		cell.border = {
-			top: { style: "thin" },
-			left: { style: "thin" },
-			bottom: { style: "thin" },
-			right: { style: "thin" },
-		};
 	});
 	currentRow++;
 
-	return currentRow; // Return next available row
+	return currentRow;
+}
+
+/**
+ * Create Attainment Weightage Configuration table
+ */
+export function createAttainmentWeightageTable(
+	ws: ExcelJS.Worksheet,
+	startRow: number,
+	directWeightage: number = 80,
+	indirectWeightage: number = 20,
+	coStartCol: number
+): number {
+	let currentRow = startRow;
+
+	// Title row
+	mergeAndStyle(ws, currentRow, 1, currentRow, Math.max(4, coStartCol - 1), {
+		value: "ATTAINMENT WEIGHTAGE CONFIGURATION",
+		bold: true,
+		align: "center",
+		fillColor: "FFE6E6FA", // Lavender
+	});
+	currentRow++;
+
+	// Direct row
+	mergeAndStyle(ws, currentRow, 1, currentRow, Math.max(3, coStartCol - 2), {
+		value: "Direct Attainment Weightage",
+		bold: true,
+		align: "left",
+	});
+	const directCell = ws.getCell(currentRow, Math.max(4, coStartCol - 1));
+	directCell.value = `${directWeightage}%`;
+	styleCell(directCell, { align: "center", bold: true });
+	currentRow++;
+
+	// Indirect row
+	mergeAndStyle(ws, currentRow, 1, currentRow, Math.max(3, coStartCol - 2), {
+		value: "Indirect Attainment Weightage",
+		bold: true,
+		align: "left",
+	});
+	const indirectCell = ws.getCell(currentRow, Math.max(4, coStartCol - 1));
+	indirectCell.value = `${indirectWeightage}%`;
+	styleCell(indirectCell, { align: "center", bold: true });
+	currentRow++;
+
+	return currentRow;
+}
+
+/**
+ * Create Indirect Attainment Table
+ */
+export function createIndirectAttainmentTable(
+	ws: ExcelJS.Worksheet,
+	startRow: number,
+	snapshotIndirectData: Array<{
+		co_name: string;
+		indirect_attainment_percentage?: number | null;
+		indirect_attainment_level?: number | null;
+	}>,
+	attainmentThresholds: AttainmentThreshold[],
+	coNames: string[],
+	coStartCol: number
+): number {
+	let currentRow = startRow;
+	const numCOs = coNames.length;
+	const totalCols = coStartCol + numCOs - 1;
+
+	// Title row
+	mergeAndStyle(ws, currentRow, 1, currentRow, totalCols, {
+		value: "INDIRECT CO ATTAINMENT (SURVEYS)",
+		bold: true,
+		size: 12,
+		align: "center",
+		fillColor: "FFE6F2FF", // Very light blue
+	});
+	currentRow++;
+
+	// Header row - CO columns
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "INDIRECT CO ATTAINMENT TABLE",
+		bold: true,
+		align: "center",
+		fillColor: "FFD3D3D3",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
+		cell.value = co;
+		styleCell(cell, {
+			bold: true,
+			align: "center",
+			fillColor: "FFD3D3D3",
+		});
+	});
+	currentRow++;
+
+	// Row 1: Indirect Attainment Percentage (%)
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "Indirect Attainment Percentage (%)",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
+		const indirectItem = snapshotIndirectData.find(item => item.co_name === co);
+		if (indirectItem && indirectItem.indirect_attainment_percentage != null) {
+			cell.value = Number(indirectItem.indirect_attainment_percentage.toFixed(2));
+			styleCell(cell, { align: "center" });
+		} else {
+			cell.value = "Not Set";
+			styleCell(cell, { align: "center", color: "FF808080", bold: true });
+		}
+	});
+	currentRow++;
+
+	// Row 2: Indirect Attainment Level
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "Indirect Attainment Level",
+		bold: true,
+		align: "left",
+		fillColor: "FFF0F8FF", // Alice Blue
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
+		const indirectItem = snapshotIndirectData.find(item => item.co_name === co);
+		if (indirectItem && indirectItem.indirect_attainment_level != null) {
+			cell.value = Number(indirectItem.indirect_attainment_level.toFixed(2));
+			const pct = indirectItem.indirect_attainment_percentage || 0;
+			styleCell(cell, {
+				bold: true,
+				align: "center",
+				fillColor: getPercentageColor(pct, attainmentThresholds),
+			});
+		} else {
+			cell.value = "Not Set";
+			styleCell(cell, {
+				bold: true,
+				align: "center",
+				fillColor: "FFD3D3D3",
+				color: "FF808080",
+			});
+		}
+	});
+	currentRow++;
+
+	return currentRow;
+}
+
+/**
+ * Create CO Attainment - Direct vs Indirect vs Final Table
+ */
+export function createDirectVsIndirectFinalTable(
+	ws: ExcelJS.Worksheet,
+	startRow: number,
+	snapshotIndirectData: Array<{
+		co_name: string;
+		attainment_percentage: number;
+		attainment_level: number;
+		indirect_attainment_percentage?: number | null;
+		indirect_attainment_level?: number | null;
+		final_attainment_percentage?: number | null;
+		final_attainment_level?: number | null;
+	}>,
+	attainmentThresholds: AttainmentThreshold[],
+	coNames: string[],
+	coStartCol: number
+): number {
+	let currentRow = startRow;
+	const numCOs = coNames.length;
+	const totalCols = coStartCol + numCOs - 1;
+
+	// Title row
+	mergeAndStyle(ws, currentRow, 1, currentRow, totalCols, {
+		value: "CO ATTAINMENT — DIRECT VS INDIRECT VS FINAL",
+		bold: true,
+		size: 12,
+		align: "center",
+		fillColor: "FFE8F5E9", // Very light green
+	});
+	currentRow++;
+
+	// Header row - CO columns
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "OUTCOME",
+		bold: true,
+		align: "center",
+		fillColor: "FFD3D3D3",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
+		cell.value = co;
+		styleCell(cell, {
+			bold: true,
+			align: "center",
+			fillColor: "FFD3D3D3",
+		});
+	});
+	currentRow++;
+
+	// Row 1: Direct Attainment %
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "Direct Attainment (%)",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
+		const item = snapshotIndirectData.find(item => item.co_name === co);
+		if (item && item.attainment_percentage != null) {
+			cell.value = Number(item.attainment_percentage.toFixed(2));
+			styleCell(cell, { align: "center" });
+		} else {
+			cell.value = "—";
+			styleCell(cell, { align: "center", color: "FF808080" });
+		}
+	});
+	currentRow++;
+
+	// Row 2: Direct Attainment Level
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "Direct Attainment Level",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
+		const item = snapshotIndirectData.find(item => item.co_name === co);
+		if (item && item.attainment_level != null) {
+			cell.value = Number(item.attainment_level.toFixed(2));
+			styleCell(cell, { align: "center" });
+		} else {
+			cell.value = "—";
+			styleCell(cell, { align: "center", color: "FF808080" });
+		}
+	});
+	currentRow++;
+
+	// Row 3: Indirect Attainment %
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "Indirect Attainment (%)",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
+		const item = snapshotIndirectData.find(item => item.co_name === co);
+		if (item && item.indirect_attainment_percentage != null) {
+			cell.value = Number(item.indirect_attainment_percentage.toFixed(2));
+			styleCell(cell, { align: "center" });
+		} else {
+			cell.value = "—";
+			styleCell(cell, { align: "center", color: "FF808080" });
+		}
+	});
+	currentRow++;
+
+	// Row 4: Indirect Attainment Level
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "Indirect Attainment Level",
+		bold: true,
+		align: "left",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
+		const item = snapshotIndirectData.find(item => item.co_name === co);
+		if (item && item.indirect_attainment_level != null) {
+			cell.value = Number(item.indirect_attainment_level.toFixed(2));
+			styleCell(cell, { align: "center" });
+		} else {
+			cell.value = "—";
+			styleCell(cell, { align: "center", color: "FF808080" });
+		}
+	});
+	currentRow++;
+
+	// Row 5: Final Blended Attainment (%)
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "Final Blended Attainment (%)",
+		bold: true,
+		align: "left",
+		fillColor: "FFE8F5E9",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
+		const item = snapshotIndirectData.find(item => item.co_name === co);
+		const finalPct = item ? (item.final_attainment_percentage ?? item.attainment_percentage) : null;
+		if (finalPct != null) {
+			cell.value = Number(finalPct.toFixed(2));
+			styleCell(cell, {
+				bold: true,
+				align: "center",
+				fillColor: getPercentageColor(finalPct, attainmentThresholds),
+			});
+		} else {
+			cell.value = "—";
+			styleCell(cell, {
+				bold: true,
+				align: "center",
+				fillColor: "FFD3D3D3",
+				color: "FF808080",
+			});
+		}
+	});
+	currentRow++;
+
+	// Row 6: Final Blended Attainment Level
+	mergeAndStyle(ws, currentRow, 1, currentRow, coStartCol - 1, {
+		value: "Final Blended Attainment Level",
+		bold: true,
+		align: "left",
+		fillColor: "FFE8F5E9",
+	});
+	coNames.forEach((co, idx) => {
+		const cell = ws.getCell(currentRow, coStartCol + idx);
+		const item = snapshotIndirectData.find(item => item.co_name === co);
+		const finalPct = item ? (item.final_attainment_percentage ?? item.attainment_percentage) : null;
+		const finalLvl = item ? (item.final_attainment_level ?? item.attainment_level) : null;
+		if (finalLvl != null) {
+			cell.value = Number(finalLvl.toFixed(2));
+			styleCell(cell, {
+				bold: true,
+				align: "center",
+				fillColor: finalPct != null ? getPercentageColor(finalPct, attainmentThresholds) : undefined,
+			});
+		} else {
+			cell.value = "—";
+			styleCell(cell, {
+				bold: true,
+				align: "center",
+				fillColor: "FFD3D3D3",
+				color: "FF808080",
+			});
+		}
+	});
+	currentRow++;
+
+	return currentRow;
 }

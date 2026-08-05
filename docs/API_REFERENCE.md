@@ -1,36 +1,35 @@
-# NBA API Reference
+# OBEMS API Reference
 
 **Base URL:** `http://localhost/nba/api/`  
 **Authentication:** All endpoints (except login) require: `Authorization: Bearer <jwt_token>`
-**Version:** 5.0 (Schema Update with Offerings & Stats)
+**Version:** 8.0 (Surveys, Action Plans, Programme Batches, Staff Enrollment)
 
 ---
 
-## 🔑 Role Architecture (v3.0+)
+## Role Architecture
 
-In version 3.0+, roles are handled via **assignments** rather than just a fixed database column.
-- **Fixed Roles:** `admin`, `faculty`, `staff`
-- **Dynamic Status:** `is_hod`, `is_dean` (Determined by active assignments in `hod_assignments` and `dean_assignments` tables).
-
-JWT tokens now include these flags. The frontend should check `user.is_hod` and `user.is_dean` for dashboard access.
+Users have a fixed **base role** (`admin`, `faculty`, `hod`, `dean`, `staff`). Additionally, `faculty`/`staff` users can hold dynamic assignments as HOD or Dean via the `hod_assignments`/`dean_assignments` tables. JWT tokens include `is_hod`, `is_dean`, `hod_department_id`, and `school_id` flags.
 
 ---
 
 ## Table of Contents
 
-1. [Authentication & Common](#authentication--common) - 6 endpoints
-2. [Admin Endpoints](#admin-endpoints) - 14 endpoints (Includes Dean Management)
-3. [HOD Endpoints](#hod-endpoints) - 9 endpoints 
-4. [Faculty Endpoints](#faculty-endpoints) - 1 endpoint
-5. [Staff Endpoints](#staff-endpoints) - 3 endpoints
-6. [Dean Endpoints](#dean-endpoints) - 9 endpoints (Includes HOD Management)
-7. [Course Management](#course-management) - 2 endpoints
-8. [Assessment Management](#assessment-management) - 2 endpoints
-9. [Marks Management](#marks-management) - 6 endpoints
-10. [Question Management](#question-management) - 2 endpoints
-11. [Student Enrollment](#student-enrollment) - 3 endpoints
-12. [Attainment Configuration](#attainment-configuration) - 4 endpoints
-13. [Error Codes](#error-codes)
+1. [Authentication & Common](#authentication--common)
+2. [Admin Endpoints](#admin-endpoints)
+3. [HOD Endpoints](#hod-endpoints)
+4. [Dean Endpoints](#dean-endpoints)
+5. [Faculty Endpoints](#faculty-endpoints)
+6. [Staff Endpoints](#staff-endpoints)
+7. [Course & Offering Management](#course--offering-management)
+8. [Assessment Management](#assessment-management)
+9. [Marks Management](#marks-management)
+10. [Enrollment Management](#enrollment-management)
+11. [Attainment Configuration](#attainment-configuration)
+12. [Attainment Snapshots](#attainment-snapshots)
+13. [Survey Management](#survey-management)
+14. [Action Plan Management](#action-plan-management)
+15. [System Settings](#system-settings)
+16. [Error Codes](#error-codes)
 
 ---
 
@@ -42,31 +41,32 @@ JWT tokens now include these flags. The frontend should check `user.is_hod` and 
 
 ```json
 // REQUEST
-{
-  "employeeIdOrEmail": "hod_cse@tezu.ac.in",
-  "password": "password123"
-}
+{ "employeeIdOrEmail": "hod_cse@tezu.ac.in", "password": "password123" }
 
 // RESPONSE (200)
 {
   "success": true,
   "token": "eyJ0eXAiOiJKV1QiLCJhbGci...",
   "user": {
-    "employee_id": 2001,
+    "employee_id": 7000001,
     "username": "HOD CSE",
     "email": "hod_cse@tezu.ac.in",
-    "role": "faculty",
+    "role": "hod",
     "is_hod": true,
     "is_dean": false,
     "hod_department_id": 1,
     "school_id": null,
+    "school_name": null,
+    "department_id": 1,
     "department_name": "Computer Science & Engineering",
-    "department_code": "CSE"
+    "department_code": "CSE",
+    "designation": "Professor",
+    "phone_numbers": ["9876543212"]
   }
 }
 
 // ERROR (401)
-{"success": false, "message": "Invalid credentials"}
+{ "success": false, "message": "Invalid credentials" }
 ```
 
 ---
@@ -78,17 +78,17 @@ JWT tokens now include these flags. The frontend should check `user.is_hod` and 
 ```json
 // RESPONSE (200)
 {
-	"success": true,
-	"data": {
-		"employee_id": 2001,
-		"username": "HOD CSE",
-		"email": "hod_cse@tezu.ac.in",
-		"role": "faculty",
-		"is_hod": true,
-		"is_dean": false,
-		"hod_department_id": 1,
-		"school_id": null
-	}
+  "success": true,
+  "data": {
+    "employee_id": 7000001,
+    "username": "HOD CSE",
+    "email": "hod_cse@tezu.ac.in",
+    "role": "hod",
+    "is_hod": true,
+    "is_dean": false,
+    "hod_department_id": 1,
+    "school_id": null
+  }
 }
 ```
 
@@ -100,69 +100,112 @@ JWT tokens now include these flags. The frontend should check `user.is_hod` and 
 
 ```json
 // REQUEST (all optional)
-{
-  "username": "newusername",
-  "email": "newemail@nba.edu",
-  "password": "newpassword"
+{ 
+  "username": "newusername", 
+  "email": "newemail@nba.edu", 
+  "designation": "Professor", 
+  "phones": ["9876543210", "9876543211"] 
 }
 
 // RESPONSE (200)
-{
-  "success": true,
-  "message": "Profile updated successfully",
-  "data": { /* updated user */ }
-}
-
-// NOTE: Role changes are not allowed via this endpoint for security reasons
+{ "success": true, "message": "Profile updated successfully", "data": { /* updated user */ } }
 ```
 
 ---
 
-### 4. Logout
+### 4. Change Password
+
+**POST** `/profile/change-password`
+
+*Note: Requires Authentication.*
+
+```json
+// REQUEST
+{ "current_password": "oldpassword123", "new_password": "newpassword456" }
+
+// RESPONSE (200)
+{ "success": true, "message": "Password changed successfully" }
+
+// ERROR (400)
+{ "success": false, "message": "Incorrect current password" }
+```
+
+---
+
+### 5. Forgot Password
+
+**POST** `/auth/forgot-password`
+
+*Note: Public endpoint. Initiates password reset by sending an email.*
+
+```json
+// REQUEST
+{ "email": "ayan14.ds@gmail.com" }
+
+// RESPONSE (200)
+{ "success": true, "message": "If this email is registered, a password reset link has been sent." }
+```
+
+---
+
+### 6. Reset Password
+
+**POST** `/auth/reset-password`
+
+*Note: Public endpoint. Completes the password reset.*
+
+```json
+// REQUEST
+{ "token": "a1b2c3d4...", "new_password": "newsecurepassword123" }
+
+// RESPONSE (200)
+{ "success": true, "message": "Password reset successful. You can now login with your new password." }
+
+// ERROR (400)
+{ "success": false, "message": "Invalid or expired token. Please request a new password reset link." }
+```
+
+---
+
+### 7. Logout
 
 **POST** `/logout`
 
 ```json
-// RESPONSE (200)
 { "success": true, "message": "Logout successful" }
 ```
 
 ---
 
-### 4.1. Get User's Department
+### 8. Get User's Department
 
 **GET** `/department`
 
 ```json
 // RESPONSE (200)
-{
-	"success": true,
-	"data": {
-		"department_id": 1,
-		"department_name": "CSE",
-		"department_code": "CSE"
-	}
-}
+{ "success": true, "data": { "department_id": 1, "department_name": "CSE", "department_code": "CSE" } }
 ```
 
 ---
 
-### 4.2. Get All Departments
+### 9. Get All Departments
 
 **GET** `/departments`
 
 ```json
 // RESPONSE (200)
-{
-	"success": true,
-	"data": [
-		{
-			"department_id": 1,
-			"department_name": "CSE",
-			"department_code": "CSE"
-		}
-	]
-}
+{ "success": true, "data": [ { "department_id": 1, "department_name": "CSE", "department_code": "CSE" } ] }
+```
+
+---
+
+### 7. Get User Phones
+
+**GET** `/users/{employeeId}/phones`
+
+```json
+// RESPONSE (200)
+{ "success": true, "data": [ { "id": 1, "phone_number": "9876543210" } ] }
 ```
 
 ---
@@ -171,88 +214,114 @@ JWT tokens now include these flags. The frontend should check `user.is_hod` and 
 
 **Role Required:** `admin`
 
-### 5. Get Admin Stats
+### 8. Get Admin Stats
 
 **GET** `/admin/stats`
 
 ```json
-{
-	"totalUsers": 50,
-	"totalCourses": 25,
-	"totalStudents": 500,
-	"totalAssessments": 75
-}
+{ "totalUsers": 50, "totalCourses": 25, "totalStudents": 500, "totalAssessments": 75 }
 ```
 
-### 6. Manage Users
+---
 
-**GET** `/admin/users` | **POST** `/admin/users` | **DELETE** `/admin/users/{id}`
+### 9. View Audit Logs
+
+**GET** `/admin/logs?page=1&limit=20`
+
+Query params: `page`, `limit`, `action` (CREATE|UPDATE|DELETE|LOGIN), `entity_type`, `entity_id`, `from_date`, `to_date`
+
+```json
+// RESPONSE (200)
+{ "success": true, "data": [...], "pagination": { "page": 1, "limit": 20, "total": 100 } }
+```
+
+---
+
+### 10. Manage Users
+
+**GET** `/admin/users` — List all users  
+**POST** `/admin/users` — Create user  
+**PUT** `/admin/users/{id}` — Update user  
+**DELETE** `/admin/users/{id}` — Delete user
 
 ```json
 // POST Request
 {
-	"employee_id": 3020,
-	"username": "New User",
-	"email": "user@tezu.edu",
-	"password": "pass123",
-	"role": "faculty",  // admin, faculty, staff
-	"department_id": 1
-}
-
-// CONSTRAINTS:
-// - HOD and Dean status are managed via separate endpoints (see below)
-// - Creating a user with role 'faculty' or 'staff' does NOT make them HOD/Dean
-```
-
-### 6.1. Manage Deans (Admin only)
-
-**POST** `/admin/schools/{schoolId}/dean` | **DELETE** `/admin/dean/{employeeId}`
-
-**A. Appoint/Create Dean**
-```json
-// Scenario 1: Assign existing faculty/staff as Dean
-{
-	"employee_id": 3001,
-	"appointment_order": "ORD/DEAN/2026/01"
-}
-
-// Scenario 2: Create new user and assign as Dean
-{
-	"employee_id": 5001,
-	"username": "DEAN_SOE",
-	"email": "dean_soe@tezu.ac.in",
-	"password": "password123",
-	"role": "faculty",
-	"department_id": 1,
-	"appointment_order": "ORD/DEAN/2026/01"
+  "employee_id": 3020,
+  "username": "New User",
+  "email": "user@tezu.edu",
+  "password": "pass123",
+  "role": "faculty",
+  "department_id": 1
 }
 ```
-
-**B. Demote Dean**
-`DELETE /admin/dean/5001`
 
 ---
 
-### 7. Manage Departments
+### 11. Manage Departments
 
-**GET** `/admin/departments` | **POST** `/admin/departments` | **PUT** `/admin/departments/{id}` | **DELETE** `/admin/departments/{id}`
+**GET** `/admin/departments` — List all  
+**POST** `/admin/departments` — Create  
+**PUT** `/admin/departments/{id}` — Update  
+**DELETE** `/admin/departments/{id}` — Delete
 
 ```json
 // POST Request
-{ 
-	"department_name": "AI & ML", 
-	"department_code": "AIML",
-	"school_id": 1 
-}
+{ "department_name": "AI & ML", "department_code": "AIML", "school_id": 1 }
 ```
-
-### 7.1. Manage Schools
-
-**GET** `/admin/schools` | **POST** `/admin/schools`
 
 ---
 
-### 8. View All Data
+### 12. Manage Programmes
+
+**GET** `/admin/programmes` — List all  
+**POST** `/admin/programmes` — Create  
+**PUT** `/admin/programmes/{id}` — Update  
+**DELETE** `/admin/programmes/{id}` — Delete
+
+```json
+// POST Request
+{ "department_id": 1, "programme_code": "CSE-MTECH", "programme_name": "M.Tech CSE", "degree_level": "PG", "duration_years": 2 }
+```
+
+**GET** `/admin/programmes/{id}/courses` — List courses in programme  
+**POST** `/admin/programmes/{id}/courses` — Add course to programme  
+**DELETE** `/admin/programmes/{id}/courses/{courseId}` — Remove course from programme  
+**POST** `/admin/programmes/{id}/students/bulk` — Bulk enroll students into programme
+
+---
+
+### 13. Manage Schools
+
+**GET** `/admin/schools` — List all  
+**POST** `/admin/schools` — Create  
+**PUT** `/admin/schools/{id}` — Update  
+**DELETE** `/admin/schools/{id}` — Delete
+
+```json
+// POST Request
+{ "school_code": "SoE", "school_name": "School of Engineering", "description": "..." }
+```
+
+---
+
+### 14. Manage Deans (Admin only)
+
+**POST** `/admin/schools/{schoolId}/dean` — Appoint/create Dean  
+**DELETE** `/admin/dean/{employeeId}` — Demote Dean  
+**GET** `/admin/dean/history` — View Dean appointment history
+
+```json
+// POST Request — assign existing faculty
+{ "employee_id": 3001, "appointment_order": "ORD/DEAN/2026/01" }
+
+// POST Request — create new user + assign as Dean
+{ "employee_id": 5001, "username": "DEAN_SOE", "email": "dean_soe@tezu.ac.in", "password": "password123", "role": "faculty", "department_id": 1, "appointment_order": "ORD/DEAN/2026/01" }
+```
+
+---
+
+### 15. View All Data
 
 **GET** `/admin/courses` | **GET** `/admin/students` | **GET** `/admin/tests`
 
@@ -260,53 +329,231 @@ JWT tokens now include these flags. The frontend should check `user.is_hod` and 
 
 ## HOD Endpoints
 
-**Status Required:** `is_hod: true`
+**Role Required:** `hod` (or `admin`)
 
-### 9. Get HOD Stats
+### 16. Get HOD Stats
 
 **GET** `/hod/stats`
 
 ```json
-{
-	"totalCourses": 15,
-	"totalFaculty": 8,
-	"totalStudents": 200,
-	"totalAssessments": 30
-}
+{ "totalCourses": 15, "totalFaculty": 8, "totalStudents": 200, "totalAssessments": 30 }
 ```
 
-### 10. Manage Courses (Create Course & Offering)
+---
 
-**GET** `/hod/courses` | **POST** `/hod/courses` | **PUT** `/hod/courses/{id}` | **DELETE** `/hod/courses/{id}`
+### 17. View Audit Logs
+
+**GET** `/hod/logs?page=1&limit=20`
+
+Same query params as admin logs, scoped to HOD's department.
+
+---
+
+### 18. Manage Base Courses (Templates)
+
+**GET** `/hod/base-courses` — List department's course templates  
+**POST** `/hod/base-courses` — Create new course template  
+**GET** `/hod/base-courses/all` — List ALL course templates  
+**PUT** `/hod/base-courses/{id}` — Update template  
+**DELETE** `/hod/base-courses/{id}` — Delete template
 
 ```json
 // POST Request
 {
-	"course_code": "CS401",
-	"name": "Machine Learning",
-	"credit": 4,
-	"faculty_id": 3001,
-	"year": 2025,
-	"semester": 1,
-    "co_threshold": 40.0,
-    "passing_threshold": 60.0
+  "course_code": "CS401",
+  "course_name": "Machine Learning",
+  "course_type": "Theory",
+  "course_level": "Undergraduate",
+  "credit": 4,
+  "department_id": 1
 }
-
-// NOTE: This creates a Course Template (if needed) AND a Course Offering for the specific year/sem.
 ```
 
-### 11. Manage Department Users
+---
 
-**GET** `/hod/faculty` | **POST** `/hod/users` | **PUT** `/hod/users/{id}` | **DELETE** `/hod/users/{id}`
+### 19. Manage Course Offerings
+
+**GET** `/hod/courses` — List department offerings  
+**POST** `/hod/courses` — Create offering (with optional faculty assignment)  
+**PUT** `/hod/courses/{id}` — Update offering  
+**DELETE** `/hod/courses/{id}` — Delete offering
 
 ```json
-// POST Request (faculty/staff only)
+// POST Request
 {
-	"employee_id": 3020,
-	"username": "New Faculty",
-	"email": "faculty@tezu.edu",
-	"password": "password",
-	"role": "faculty"
+  "course_id": 1,
+  "year": 2026,
+  "semester": "Spring",
+  "co_threshold": 40.0,
+  "passing_threshold": 60.0,
+  "faculty_id": 3001
+}
+```
+
+---
+
+### 20. Manage Department Users
+
+**GET** `/hod/faculty` — List department faculty  
+**POST** `/hod/users` — Create new faculty/staff  
+**PUT** `/hod/users/{id}` — Update user  
+**DELETE** `/hod/users/{id}` — Delete user
+
+```json
+// POST Request
+{ "employee_id": 3020, "username": "New Faculty", "email": "faculty@tezu.edu", "password": "password", "role": "faculty" }
+```
+
+---
+
+### 21. Manage Students
+
+**GET** `/hod/students` — List department students  
+**PUT** `/hod/students/{rollno}` — Update student
+
+---
+
+### 22. Manage Programmes
+
+**GET** `/hod/programmes` — List department programmes  
+**POST** `/hod/programmes` — Create programme  
+**PUT** `/hod/programmes/{id}` — Update programme  
+**DELETE** `/hod/programmes/{id}` — Delete programme  
+**GET** `/hod/programmes/with-batches` — List programmes that have batches
+
+**GET** `/hod/programmes/{id}/courses` — List courses in programme  
+**POST** `/hod/programmes/{id}/courses` — Add course to programme  
+**DELETE** `/hod/programmes/{id}/courses/{courseId}` — Remove course from programme  
+**POST** `/hod/programmes/{id}/students/bulk` — Bulk enroll students into programme  
+**PUT** `/hod/programmes/{id}/weightage` — Update programme weightage
+
+```json
+// POST Programme
+{ "programme_code": "CSE-BTECH", "programme_name": "B.Tech CSE", "degree_level": "UG", "duration_years": 4 }
+
+// PUT Weightage
+{ "co_weightage": 40, "po_weightage": 60 }
+```
+
+---
+
+### 23. Manage Programme Batches
+
+**GET** `/hod/programmes/{programmeId}/batches` — List batches for a programme  
+**POST** `/hod/programmes/{programmeId}/batches` — Create a new batch  
+**GET** `/hod/batches/{batchId}` — Get batch details
+
+```json
+// POST Request
+{ "batch_year": 2024, "academic_year": "2024-2028" }
+```
+
+---
+
+### 24. Course Completion Workflow
+
+**GET** `/hod/offerings/{offeringId}/test-averages` — View test averages  
+**POST** `/hod/offerings/{offeringId}/reopen` — Reopen a concluded course (clears snapshot, sets `is_active = 1`)
+
+---
+
+## Dean Endpoints
+
+**Role Required:** `is_dean: true`
+
+### 25. Get Dean Stats
+
+**GET** `/dean/stats`
+
+```json
+{ "totalDepartments": 7, "totalStudents": 1500, "totalCourses": 45, "usersByRole": { "faculty": 42, "staff": 8 } }
+```
+
+---
+
+### 26. View & Manage Departments
+
+**GET** `/dean/departments` — List departments (scoped to assigned school)  
+**POST** `/dean/departments` — Create department (scoped to assigned school, auto-creates HOD login account)  
+**PUT** `/dean/departments/{id}` — Update department  
+**DELETE** `/dean/departments/{id}` — Delete department  
+**GET** `/dean/users` | **GET** `/dean/courses` | **GET** `/dean/students` | **GET** `/dean/tests`
+
+```json
+// POST Request
+{ "department_name": "AI & ML Department", "department_code": "AIML", "description": "..." }
+
+// Response (201)
+{
+  "success": true,
+  "message": "Department and HOD account created successfully",
+  "data": {
+    "department_id": 12,
+    "department_name": "AI & ML Department",
+    "department_code": "AIML"
+  }
+}
+```
+
+---
+
+### 27. Department Analytics
+
+**GET** `/dean/analytics`
+
+```json
+[ { "department_name": "CSE", "avg_attainment": 75.2 } ]
+```
+
+---
+
+### 28. Manage HODs
+
+**GET** `/dean/departments/{departmentId}/faculty` — List faculty in department  
+**POST** `/dean/departments/{departmentId}/hod` — Appoint HOD  
+**DELETE** `/dean/hod/{employeeId}` — Demote HOD  
+**GET** `/dean/hod/history` — View HOD appointment history
+
+```json
+// POST Request — assign existing faculty
+{ "employee_id": 3001, "appointment_order": "ORD/HOD/2026/01" }
+
+// POST Request — create new HOD
+{ "employee_id": 2005, "username": "New HOD", "email": "hod_new@tezu.ac.in", "password": "password123", "role": "faculty", "appointment_order": "ORD/HOD/2026/01" }
+```
+
+---
+
+### 28b. View School Audit Logs
+
+**GET** `/dean/logs?page=1&limit=50`
+
+Query params: `page`, `limit`, `sort`, `sort_dir`, `action`, `entity_type`, `user_id`
+
+```json
+// RESPONSE (200)
+{
+  "success": true,
+  "data": [
+    {
+      "id": 15,
+      "user_id": 3001,
+      "username": "faculty_member",
+      "action": "CREATE",
+      "entity_type": "Course",
+      "entity_id": "45",
+      "old_values": null,
+      "new_values": { "course_name": "Deep Learning" },
+      "ip_address": "127.0.0.1",
+      "created_at": "2026-06-03 12:00:00"
+    }
+  ],
+  "pagination": {
+    "total_items": 120,
+    "total_pages": 3,
+    "current_page": 1,
+    "limit": 50
+  }
 }
 ```
 
@@ -316,24 +563,68 @@ JWT tokens now include these flags. The frontend should check `user.is_hod` and 
 
 **Role Required:** `faculty` or `hod`
 
-### 12. Get Faculty Stats
+### 29. Get Faculty Stats
 
 **GET** `/faculty/stats`
 
 ```json
+{ "totalCourses": 3, "totalTests": 12, "averageAttainment": 72.5 }
+```
+
+---
+
+### 30. View Audit Logs
+
+**GET** `/faculty/logs?page=1&limit=20`
+
+---
+
+### 31. Get Faculty Courses
+
+**GET** `/faculty/courses`
+
+Returns courses assigned to the authenticated faculty member.
+
+```json
 {
-	"totalCourses": 3,
-	"totalTests": 12,
-	"averageAttainment": 72.5
+  "success": true,
+  "data": [
+    { "offering_id": 1, "course_id": 1, "course_code": "CS101", "course_name": "Intro to Programming", "year": 2026, "semester": "Spring", "assignment_type": "Primary", "is_active": 1 }
+  ]
 }
 ```
 
-### 12.1. Delete Test
+---
+
+### 32. Get Enrolled Students
+
+**GET** `/faculty/students`
+
+Returns students enrolled in the faculty's courses.
+
+---
+
+### 33. Manage Students
+
+**PUT** `/faculty/students/{rollno}` — Update student  
+**DELETE** `/faculty/students/{rollno}` — Remove student from all courses
+
+---
+
+### 34. Course Completion Workflow
+
+**GET** `/faculty/courses/{offeringId}/check-completion` — Check whether course can be concluded  
+**POST** `/faculty/courses/{offeringId}/conclude` — Conclude (lock) course, computing & persisting attainment snapshots  
+**GET** `/faculty/courses/{offeringId}/stats` — Get course-level statistics  
+**GET** `/faculty/courses/{offeringId}/test-averages` — Get test averages for offering
+
+---
+
+### 35. Delete Test
 
 **DELETE** `/tests/{id}`
 
 ```json
-// RESPONSE (200)
 { "success": true, "message": "Test deleted successfully" }
 ```
 
@@ -341,9 +632,9 @@ JWT tokens now include these flags. The frontend should check `user.is_hod` and 
 
 ## Staff Endpoints
 
-**Status Required:** `role: staff` (including users with `is_dean: true` if their base role is staff)
+**Role Required:** `staff`
 
-### 13. Get Staff Stats
+### 36. Get Staff Stats
 
 **GET** `/staff/stats`
 
@@ -351,129 +642,51 @@ JWT tokens now include these flags. The frontend should check `user.is_hod` and 
 { "totalCourses": 20, "totalStudents": 300, "totalEnrollments": 450 }
 ```
 
-### 14. View Department Data
+---
 
-**GET** `/staff/courses` | **GET** `/staff/students`
+### 37. Manage Courses
+
+**GET** `/staff/courses` — List department courses  
+**POST** `/staff/courses` — Create course offering  
+**PUT** `/staff/courses/{id}` — Update offering  
+**DELETE** `/staff/courses/{id}` — Delete offering
 
 ---
 
-## Dean Endpoints
+### 38. Manage Course Enrollments (Staff)
 
-**Status Required:** `is_dean: true` (Read-only access to all data + HOD management)
-
-### 15. Get Dean Stats
-
-**GET** `/dean/stats`
+**GET** `/staff/courses/{courseId}/enrollments` — List enrollments for a course  
+**POST** `/staff/courses/{courseId}/enrollments` — Bulk enroll students  
+**DELETE** `/staff/courses/{courseId}/enrollments/{rollno}` — Remove a single enrollment
 
 ```json
-{
-	"totalDepartments": 7,
-	"totalStudents": 1500,
-	"totalCourses": 45,
-	"usersByRole": { "faculty": 42, "staff": 8 } 
-}
-```
-
-### 16. View All Data
-
-**GET** `/dean/departments` | **GET** `/dean/users` | **GET** `/dean/courses` | **GET** `/dean/students` | **GET** `/dean/tests`
-
-### 17. Department Analytics
-
-**GET** `/dean/analytics`
-
-```json
-[
-	{
-		"department_name": "CSE",
-		"avg_attainment": 75.2
-	}
-]
+// POST Request
+{ "students": [ { "roll_no": "2024CSE001", "student_name": "Alice Johnson", "programme_id": 1 } ] }
 ```
 
 ---
 
-### 18. Get Department Faculty
+### 39. View Data
 
-**GET** `/dean/departments/{departmentId}/faculty`
-
-```json
-// RESPONSE (200)
-{
-	"success": true,
-	"data": [
-		{ "employee_id": 3001, "username": "Faculty Name", ... }
-	]
-}
-```
+**GET** `/staff/faculty` — List department faculty  
+**GET** `/staff/students` — List department students  
+**GET** `/staff/base-courses` — List department base course templates  
+**GET** `/staff/programmes` — List department programmes
 
 ---
 
-### 19. Appoint HOD
+## Course & Offering Management
 
-**POST** `/dean/departments/{departmentId}/hod`
-
-```json
-// REQUEST (Scenario 1: Promote existing faculty)
-{
-	"employee_id": 3001,
-	"appointment_order": "ORD/HOD/2026/01"
-}
-
-// REQUEST (Scenario 2: Create new HOD)
-{
-	"employee_id": 2005,
-	"username": "New HOD",
-	"email": "hod_new@tezu.ac.in",
-	"password": "password123",
-	"role": "faculty",
-	"appointment_order": "ORD/HOD/2026/01"
-}
-
-// RESPONSE (200/201)
-{
-	"success": true,
-	"message": "HOD appointed successfully"
-}
-```
-
----
-
-### 20. Demote HOD
-
-**DELETE** `/dean/hod/{employeeId}`
-
-```json
-// RESPONSE (200)
-{
-	"success": true,
-	"message": "HOD demoted successfully"
-}
-```
-
----
-
-## Course Management
-
-### 21. Get Faculty Courses (Offerings)
+### 40. Get Courses (Available to all authenticated users)
 
 **GET** `/courses`
 
 ```json
-// RESPONSE (200)
 {
-	"success": true,
-	"data": [
-		{
-			"offering_id": 1,
-            "course_id": 1,
-			"course_code": "CS101",
-			"course_name": "Intro to Programming",
-			"year": 2025,
-			"semester": 1,
-            "assignment_type": "Primary"
-		}
-	]
+  "success": true,
+  "data": [
+    { "offering_id": 1, "course_id": 1, "course_code": "CS101", "course_name": "Intro to Programming", "year": 2026, "semester": "Spring", "assignment_type": "Primary" }
+  ]
 }
 ```
 
@@ -481,14 +694,14 @@ JWT tokens now include these flags. The frontend should check `user.is_hod` and 
 
 ## Assessment Management
 
-### 23. Create Assessment
+### 41. Create Assessment
 
 **POST** `/assessment`
 
 ```json
 // REQUEST
 {
-  "course_id": 1, 
+  "offering_id": 1,
   "name": "Mid Semester Exam",
   "test_type": "Mid Sem",
   "full_marks": 50,
@@ -499,279 +712,210 @@ JWT tokens now include these flags. The frontend should check `user.is_hod` and 
   ]
 }
 
-// NOTE: check `course_id`: This refers to the Offering ID (retrieved from /courses), NOT the generic course template ID. 
 // RESPONSE (201)
-{
-  "success": true,
-  "message": "Assessment created successfully"
-}
+{ "success": true, "message": "Assessment created successfully" }
 ```
 
 ---
 
-### 24. Get Assessment Details
+### 42. Get Assessment Details
 
 **GET** `/assessment?test_id=1`
 
 ```json
 // RESPONSE (200)
 {
-	"success": true,
-	"data": {
-		"test_id": 1,
-		"offering_id": 5, // References specific offering
-        "test_name": "Mid Sem",
-        "questions": [...]
-	}
+  "success": true,
+  "data": {
+    "test_id": 1,
+    "offering_id": 5,
+    "test_name": "Mid Sem",
+    "test_type": "Mid Sem",
+    "full_marks": 50,
+    "pass_marks": 20,
+    "questions": [
+      { "question_id": 1, "question_number": 1, "co": 1, "max_marks": 10 }
+    ]
+  }
 }
 ```
 
 ---
 
-### 22. Get Course Tests
+### 43. Get Course Tests
 
-**GET** `/course-tests?course_id=1`
-
-**Note:** `course_id` param actually accepts `offering_id`.
+**GET** `/course-tests?offering_id=1`
 
 ```json
-// RESPONSE (200)
 {
-	"success": true,
-	"data": [
-		{ "test_id": 1, "test_name": "Mid Sem", ... }
-	]
+  "success": true,
+  "data": [
+    { "test_id": 1, "offering_id": 1, "test_name": "Mid Sem", "test_type": "Mid Sem", "full_marks": 50, "pass_marks": 20 }
+  ]
 }
+```
+
+---
+
+### 44. Update Question
+
+**PUT** `/questions/{id}`
+
+```json
+// REQUEST (all optional)
+{ "co_number": 3, "max_marks": 15, "is_optional": false }
+```
+
+---
+
+### 45. Delete Question
+
+**DELETE** `/questions/{id}`
+
+```json
+{ "success": true, "message": "Question deleted successfully" }
 ```
 
 ---
 
 ## Marks Management
 
-### 25. Save Marks by Question
+### 46. Save Marks by Question
 
 **POST** `/marks/by-question`
 
 ```json
 // REQUEST
-{
-  "test_id": 1,
-  "student_id": "CS101", // Roll No
-  "question_id": 5,
-  "marks_obtained": 8.5
-}
+{ "test_id": 1, "student_id": "2024CSE001", "question_id": 5, "marks_obtained": 8.5 }
 
 // RESPONSE (200)
-{
-  "success": true,
-  "message": "Marks saved successfully"
-}
-
-// NOTE: CO totals auto-calculated
+{ "success": true, "message": "Marks saved successfully" }
 ```
 
 ---
 
-### 26. Save Marks by CO
+### 47. Save Marks by CO
 
 **POST** `/marks/by-co`
 
 ```json
 // REQUEST
-{
-  "test_id": 1,
-  "student_roll_no": "CS101",
-  "CO1": 10,
-  "CO2": 8,
-  "CO3": 5,
-  "CO4": 0,
-  "CO5": 0,
-  "CO6": 0
-}
+{ "test_id": 1, "student_roll_no": "2024CSE001", "CO1": 10, "CO2": 8, "CO3": 5, "CO4": 0, "CO5": 0, "CO6": 0 }
 
 // RESPONSE (200)
-{
-  "success": true,
-  "message": "Marks saved successfully"
-}
+{ "success": true, "message": "Marks saved successfully" }
 ```
 
 ---
 
-### 27. Bulk Save Marks
+### 48. Bulk Save Marks
 
 **POST** `/marks/bulk`
 
 ```json
 // REQUEST
-{
-  "test_id": 1,
-  "marks": [
-     { "student_id": "CS001", "question_id": 1, "marks_obtained": 5 },
-     { "student_id": "CS001", "question_id": 2, "marks_obtained": 4 }
-  ]
-}
+{ "test_id": 1, "marks": [ { "student_id": "2024CSE001", "question_id": 1, "marks_obtained": 5 }, { "student_id": "2024CSE001", "question_id": 2, "marks_obtained": 4 } ] }
 
 // RESPONSE (200)
-{
-  "success": true,
-  "message": "Bulk marks saved",
-  "data": { "success_count": 2, "fail_count": 0 }
-}
+{ "success": true, "message": "Bulk marks saved", "data": { "success_count": 2, "fail_count": 0 } }
 ```
 
 ---
 
-### 28. Get Student Marks
+### 49. Get Student Marks
 
-**GET** `/marks?test_id=1&student_id=CS101`
+**GET** `/marks?test_id=1&student_id=2024CSE001`
 
 ```json
 // RESPONSE (200)
-{
-	"success": true,
-	"data": {
-		"CO1": 10,
-        "CO2": 15,
-        ...
-	}
-}
+{ "success": true, "data": { "CO1": 10, "CO2": 15, "CO3": 5 } }
 ```
 
 ---
 
-### 29. Get Test Marks (All Students)
+### 50. Get Test Marks (All Students)
 
 **GET** `/marks/test?test_id=1&include_raw=true`
 
 ```json
 // RESPONSE (200)
 {
-	"success": true,
-	"data": [
-		{ "student_roll_no": "CS001", "CO1": 10, ... }
-	]
+  "success": true,
+  "data": [
+    { "student_roll_no": "2024CSE001", "student_id": "2024CSE001", "student_name": "Alice Johnson", "CO1": 10, "CO2": 8, "CO3": 5, "programme_id": 1, "programme_name": "B.Tech CSE" }
+  ]
 }
 ```
 
 ---
 
-### 30. Update Raw Marks Entry
+### 51. Update Raw Marks Entry
 
 **PUT** `/marks/raw/{id}`
 
 ```json
 // REQUEST
-{
-  "marks_obtained": 8.5
-}
+{ "marks_obtained": 8.5 }
 ```
 
 ---
 
-### 31. Delete Raw Marks Entry
+### 52. Delete Raw Marks Entry
 
 **DELETE** `/marks/raw/{id}`
 
 ```json
-// RESPONSE (200)
 { "success": true, "message": "Marks entry deleted successfully" }
 ```
 
 ---
 
-### 32. Delete All Student Marks
+### 53. Delete All Student Marks
 
 **DELETE** `/marks/student/{testId}/{studentId}`
 
 ```json
-// RESPONSE (200)
-{
-	"success": true,
-	"message": "All marks deleted for student in this test"
-}
+{ "success": true, "message": "All marks deleted for student in this test" }
 ```
 
 ---
 
-## Question Management
+## Enrollment Management
 
-### 33. Update Question
+### 54. Bulk Enroll Students
 
-**PUT** `/questions/{id}`
-
-```json
-// REQUEST (all optional)
-{
-  "co_number": 3,
-  "max_marks": 15,
-  "is_optional": false
-}
-```
-
----
-
-### 34. Delete Question
-
-**DELETE** `/questions/{id}`
-
-```json
-// RESPONSE (200)
-{ "success": true, "message": "Question deleted successfully" }
-```
-
----
-
-## Student Enrollment
-
-### 35. Bulk Enroll Students
-
-**POST** `/courses/{courseId}/enroll`
-
-**Note:** `courseId` in URL is `offering_id` of the specific year/sem course invocation.
+**POST** `/offerings/{offeringId}/enroll`
 
 ```json
 // REQUEST
-{
-  "students": [
-    { "roll_no": "CS001", "name": "Alice" },
-    { "roll_no": "CS002", "name": "Bob" }
-  ]
-}
+{ "students": [ { "roll_no": "2024CSE001", "student_name": "Alice Johnson", "programme_id": 1 } ] }
 
 // RESPONSE (200)
+{ "success": true, "message": "Students enrolled successfully" }
+```
+
+---
+
+### 55. Get Course Enrollments
+
+**GET** `/offerings/{offeringId}/enrollments?test_id=1`
+
+```json
 {
   "success": true,
-  "message": "Students enrolled successfully"
+  "data": [
+    { "enrollment_id": 1, "student_rollno": "2024CSE001", "student_name": "Alice Johnson", "programme_id": 1, "programme_name": "B.Tech CSE" }
+  ]
 }
 ```
 
 ---
 
-### 36. Get Course Enrollments
+### 56. Remove Enrollment
 
-**GET** `/courses/{courseId}/enrollments?test_id={testId}`
-
-**Note:** `courseId` in URL is `offering_id`.
+**DELETE** `/offerings/{offeringId}/enroll/{rollno}`
 
 ```json
-// RESPONSE (200)
-{
-	"success": true,
-	"data": [
-		{ "enrollment_id": 101, "student_rollno": "CS001", "student_name": "Alice", ... }
-	]
-}
-```
-
----
-
-### 36.1. Remove Enrollment
-
-**DELETE** `/courses/{courseId}/enroll/{rollno}`
-
-```json
-// RESPONSE (200)
 { "success": true, "message": "Enrollment removed successfully" }
 ```
 
@@ -779,80 +923,407 @@ JWT tokens now include these flags. The frontend should check `user.is_hod` and 
 
 ## Attainment Configuration
 
-### 37. Get Attainment Config
+### 57. Get Attainment Config
 
-**GET** `/courses/{courseId}/attainment-config`
-
-**Note:** `courseId` here is the **Course Template ID**, NOT the offering ID. Attainment Scales are configured globally per course template.
+**GET** `/offerings/{offeringId}/attainment-config`
 
 ```json
 // RESPONSE (200)
 {
-	"course_id": 1,
-	"scales": [
-		{ "level": 1, "min_percentage": 40 },
-        { "level": 2, "min_percentage": 60 },
-        { "level": 3, "min_percentage": 75 }
-	]
+  "success": true,
+  "data": {
+    "offering_id": 1,
+    "course_id": 1,
+    "co_threshold": 40.0,
+    "passing_threshold": 60.0,
+    "attainment_thresholds": [
+      { "id": 1, "level": 1, "percentage": 40 },
+      { "id": 2, "level": 2, "percentage": 60 },
+      { "id": 3, "level": 3, "percentage": 80 }
+    ]
+  }
 }
 ```
 
 ---
 
-### 38. Save Attainment Config
+### 58. Save Attainment Config
 
-**POST** `/courses/{courseId}/attainment-config`
+**POST** `/offerings/{offeringId}/attainment-config`
 
 ```json
 // REQUEST
 {
   "co_threshold": 40.0,
-  "scales": [
-      { "level": 1, "min_percentage": 40 },
-      { "level": 2, "min_percentage": 60 },
-      { "level": 3, "min_percentage": 75 }
+  "passing_threshold": 60.0,
+  "attainment_thresholds": [
+    { "id": 1, "percentage": 70 },
+    { "id": 2, "percentage": 60 },
+    { "id": 3, "percentage": 50 }
   ]
 }
 
 // RESPONSE (200)
-{"success": true, "message": "Configuration saved successfully"}
+{
+  "success": true,
+  "message": "Attainment configuration saved successfully",
+  "data": { "offering_id": 1, "course_id": 1, "co_threshold": 40.0, "passing_threshold": 60.0, "attainment_thresholds_saved": 3 }
+}
 ```
+
+**Note:** The `level` for each threshold is auto-computed from the sort order of `percentage` (highest percentage = highest level).
 
 ---
 
-### 39. Get CO-PO Matrix
+### 59. Get CO-PO Matrix
 
-**GET** `/courses/{courseId}/copo-matrix`
-
-**Note:** `courseId` here is the **Course Template ID**.
+**GET** `/offerings/{offeringId}/copo-matrix`
 
 ```json
 // RESPONSE (200)
 {
-	"success": true,
-	"data": [
-		{ "co_name": "CO1", "po_name": "PO1", "value": 3 }
-	]
+  "success": true,
+  "data": [
+    { "co_number": 1, "po_name": "PO1", "value": 3 },
+    { "co_number": 1, "po_name": "PO2", "value": 2 }
+  ]
 }
 ```
 
 ---
 
-### 40. Save CO-PO Matrix
+### 60. Save CO-PO Matrix
 
-**POST** `/courses/{courseId}/copo-matrix`
+**POST** `/offerings/{offeringId}/copo-matrix`
 
 ```json
 // REQUEST
 {
-  "matrix": [
-    { "co_name": "CO1", "po_name": "PO1", "value": 3 },
-    { "co_name": "CO1", "po_name": "PO2", "value": 1 }
+  "mappings": [
+    { "co": "CO1", "po": "PO1", "value": 3 },
+    { "co": "CO1", "po": "PO2", "value": 2 }
   ]
 }
 
 // RESPONSE (200)
-{"success": true, "message": "CO-PO mapping saved successfully"}
+{ "success": true, "message": "CO-PO Matrix saved successfully" }
+```
+
+**Note:** Uses `mappings` array with `co` (string), `po` (string), `value` (0-3).
+
+---
+
+## Attainment Snapshots
+
+### 61. Get Offering Attainment
+
+**GET** `/offerings/{offeringId}/attainment`
+
+Returns persisted snapshot data when the course is concluded/locked, otherwise computes a live preview.
+
+```json
+// RESPONSE (200)
+{
+  "success": true,
+  "snapshot_exists": true,
+  "data": {
+    "offering_id": 10,
+    "co_threshold": 55.0,
+    "passing_threshold": 30.0,
+    "attainment_thresholds": [
+      { "id": 1, "level": 3, "percentage": 70 },
+      { "id": 2, "level": 2, "percentage": 60 },
+      { "id": 3, "level": 1, "percentage": 50 }
+    ],
+    "co_attainment": [
+      { "offering_id": 10, "co_number": 1, "co_name": "CO1", "attainment_percentage": 69.62, "attainment_level": 1.96, "calculated_at": "2026-05-15 12:00:00" }
+    ],
+    "po_attainment": [
+      { "offering_id": 10, "po_name": "PO1", "attainment_value": 1.95, "calculated_at": "2026-05-15 12:00:00" }
+    ]
+  }
+}
+```
+
+**Note:** `co_name` is computed as `CONCAT('CO', co_number)` for API backward compatibility.
+
+---
+
+### 62. Get Programme Attainment
+
+**GET** `/programmes/{programmeId}/attainment?batch_year=2024`
+
+Returns PO attainment averaged across all locked offerings whose enrolled students belong to the specified programme/batch. Uses an `EXISTS` clause to avoid student-count weighting.
+
+```json
+// RESPONSE (200)
+{
+  "success": true,
+  "data": {
+    "programme_id": 1,
+    "batch_year": 2024,
+    "po_attainment": [
+      { "po_name": "PO1", "attainment_value": 1.95, "offering_count": 3 },
+      { "po_name": "PO2", "attainment_value": 2.10, "offering_count": 3 }
+    ]
+  }
+}
+```
+
+`batch_year` query param is optional — omit to include all batches.
+
+---
+
+### 63. Calculate Programme Attainment
+
+**POST** `/programmes/{programmeId}/attainment?batch_year=2024`
+
+Triggers a fresh calculation of programme-level attainment (PO attainment averaged across locked offerings).
+
+```json
+// RESPONSE (200)
+{
+  "success": true,
+  "message": "Programme attainment calculated successfully",
+  "data": {
+    "programme_id": 1,
+    "batch_year": 2024,
+    "po_attainment": [ ... ]
+  }
+}
+```
+
+---
+
+### 64. Get Course-Level Programme Attainment
+
+**GET** `/programmes/{programmeId}/attainment/courses?batch_year=2024`
+
+Returns course-level CO/PO attainment for a programme. Shows which courses contributed to programme PO attainment.
+
+```json
+// RESPONSE (200)
+{
+  "success": true,
+  "data": [
+    {
+      "offering_id": 10,
+      "course_code": "CS101",
+      "course_name": "Intro to Programming",
+      "co_attainment": [ ... ],
+      "po_attainment": [ ... ]
+    }
+  ]
+}
+```
+
+---
+
+### Conclude Course (triggers snapshot)
+
+**POST** `/faculty/courses/{offeringId}/conclude`
+
+Persists CO and PO attainment snapshots, then sets `course_faculty_assignments.is_active = 0`.
+
+```json
+// RESPONSE (200)
+{
+  "success": true,
+  "message": "Course concluded successfully",
+  "data": {
+    "offering_id": 10,
+    "co_attainment": [ ... ],
+    "po_attainment": [ ... ]
+  }
+}
+```
+
+---
+
+### Reopen Course (clears snapshot)
+
+**POST** `/hod/offerings/{offeringId}/reopen`
+
+Clears attainment snapshots and sets `course_faculty_assignments.is_active = 1`.
+
+```json
+// RESPONSE (200)
+{ "success": true, "message": "Course offering reopened successfully" }
+```
+
+---
+
+## Survey Management
+
+### 65. Course Exit Survey
+
+**GET** `/offerings/{offeringId}/survey/course-exit` — Get course exit survey data  
+**DELETE** `/offerings/{offeringId}/survey/course-exit` — Clear course exit survey data
+
+**GET** `/offerings/{offeringId}/survey/course-exit/enrollments` — Get students eligible for course exit survey
+
+**POST** `/offerings/{offeringId}/survey/course-exit/questions` — Save manually defined course exit questions
+
+```json
+// POST /questions Request
+{
+  "questions": [
+    { "question_text": "Rate the course content", "question_type": "rating", "max_rating": 5 }
+  ]
+}
+```
+
+**POST** `/offerings/{offeringId}/survey/course-exit/responses/manual` — Save manual responses for course exit survey
+
+```json
+{
+  "responses": [
+    { "student_rollno": "2024CSE001", "question_id": 1, "response_value": 4 }
+  ]
+}
+```
+
+**POST** `/offerings/{offeringId}/survey/course-exit/import` — Import course exit CSV
+
+**GET** `/offerings/{offeringId}/survey/course-exit/results` — Get course exit survey results
+
+---
+
+### 66. Stakeholder Survey (Programme Level)
+
+**GET** `/programmes/{programmeId}/survey/stakeholder` — Get stakeholder survey data  
+**DELETE** `/programmes/{programmeId}/survey/stakeholder` — Clear stakeholder survey data
+
+**POST** `/programmes/{programmeId}/survey/stakeholder/questions` — Save stakeholder survey questions
+
+**POST** `/programmes/{programmeId}/survey/stakeholder/import` — Import stakeholder survey CSV
+
+**GET** `/programmes/{programmeId}/survey/stakeholder/responses/manual` — Get manual stakeholder responses  
+**POST** `/programmes/{programmeId}/survey/stakeholder/responses/manual` — Save manual stakeholder responses
+
+**GET** `/programmes/{programmeId}/survey/stakeholder/results` — Get stakeholder survey results
+
+---
+
+## Action Plan Management
+
+### 67. Manage Action Plans
+
+**GET** `/programmes/{programmeId}/action-plans` — List action plans for a programme  
+**POST** `/programmes/{programmeId}/action-plans` — Create a new action plan
+
+```json
+// POST Request
+{
+  "po_name": "PO1",
+  "target_value": 2.5,
+  "strategy": "Improve lab assessments",
+  "timeline": "2026-2027",
+  "responsible_person": "Dr. Sharma"
+}
+```
+
+**PUT** `/action-plans/{planId}` — Update an action plan  
+**DELETE** `/action-plans/{planId}` — Delete an action plan
+
+```json
+// PUT Request
+{ "strategy": "Updated strategy", "target_value": 2.8, "status": "in_progress" }
+```
+
+---
+
+### 68. Programme Attainment Targets
+
+**GET** `/programmes/{programmeId}/attainment/targets` — Get attainment targets for a programme  
+**POST** `/programmes/{programmeId}/attainment/targets` — Set/update attainment targets
+
+```json
+// POST Request
+{
+  "targets": [
+    { "po_name": "PO1", "target_value": 2.5 },
+    { "po_name": "PO2", "target_value": 2.0 }
+  ]
+}
+```
+
+## System Settings
+
+### 69. Get Public System Settings
+
+**GET** `/settings/public`
+
+*Note: Public endpoint. Returns system configuration metadata used for UI branding.*
+
+```json
+// RESPONSE (200)
+{
+  "success": true,
+  "data": {
+    "university_name": "Tezpur University",
+    "university_subtitle": "A Central University • Est. 1994",
+    "system_name": "Outcome Based Education System",
+    "system_short_name": "OBEMS",
+    "logo_url": "/tulogo.png",
+    "motto_text": "विज्ञानं यज्ञं तनुते",
+    "motto_subtext": "Specialized knowledge promotes creativity"
+  }
+}
+```
+
+---
+
+### 70. Bulk Update Settings
+
+**POST** `/admin/settings` (aliases: `/settings`)
+
+*Note: Requires Admin role.*
+
+```json
+// REQUEST
+{
+  "university_name": "Tezpur University New",
+  "university_subtitle": "A Central University • Est. 1994",
+  "system_name": "Outcome Based Education System",
+  "system_short_name": "OBEMS",
+  "motto_text": "विज्ञानं यज्ञं तनुते",
+  "motto_subtext": "Specialized knowledge promotes creativity"
+}
+
+// RESPONSE (200)
+{
+  "success": true,
+  "message": "Settings updated successfully",
+  "data": {
+    "university_name": "Tezpur University New",
+    "university_subtitle": "A Central University • Est. 1994",
+    "system_name": "Outcome Based Education System",
+    "system_short_name": "OBEMS",
+    "logo_url": "/uploads/branding/logo_1716312345.png",
+    "motto_text": "विज्ञानं यज्ञं तनुते",
+    "motto_subtext": "Specialized knowledge promotes creativity"
+  }
+}
+```
+
+---
+
+### 71. Upload Branding Logo
+
+**POST** `/admin/settings/logo` (aliases: `/settings/logo`)
+
+*Note: Requires Admin role. Expects multipart/form-data upload with a 'logo' image file.*
+
+```json
+// RESPONSE (200)
+{
+  "success": true,
+  "message": "Logo uploaded and updated successfully",
+  "data": {
+    "logo_url": "/uploads/branding/logo_1716312345.png"
+  }
+}
 ```
 
 ---
@@ -862,8 +1333,10 @@ JWT tokens now include these flags. The frontend should check `user.is_hod` and 
 | Code | Meaning      | Common Fix                     |
 | ---- | ------------ | ------------------------------ |
 | 200  | Success      | -                              |
+| 201  | Created      | Resource created successfully  |
 | 400  | Bad Request  | Check input format             |
 | 401  | Unauthorized | Add valid JWT token            |
-| 403  | Forbidden    | Use account that owns resource |
+| 403  | Forbidden    | Use account with proper role   |
 | 404  | Not Found    | Check resource ID              |
+| 405  | Method Not Allowed | Check HTTP method         |
 | 500  | Server Error | Check logs for details         |

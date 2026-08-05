@@ -14,6 +14,9 @@ import { fillStudentData } from "./studentRows";
 import {
 	createCOAttainmentPointScaleTable,
 	createCOAttainmentAbsoluteScaleTable,
+	createAttainmentWeightageTable,
+	createIndirectAttainmentTable,
+	createDirectVsIndirectFinalTable,
 } from "./coAttainmentTables";
 import { createCOPOMappingTable } from "./copoMappingTable";
 
@@ -32,17 +35,32 @@ export async function exportAttainmentExcel(opts: AttainmentExportOptions) {
 		coThreshold,
 		passingThreshold,
 		courseCode,
-		facultyName = "Dr S. S. Satapathy",
-		branch = "Mechanical Engineering",
-		programme = "B. Tech",
-		year = "I",
-		semester = "II",
-		courseName = "Introductory Computing",
-		session = "2021-22",
+		facultyName = "",
+		branch = "",
+		programme = "",
+		year = "",
+		semester = "",
+		courseName = "",
+		session = "",
 		studentsData = [],
 		assessments = [],
 		copoMatrix = {},
+		snapshotIndirectData = [],
+		directWeightage,
+		indirectWeightage,
 	} = opts;
+
+	// Determine unique CO names dynamically from the data
+	const coNames = Array.from(
+		new Set([
+			...(studentsData ? studentsData.flatMap(s => Object.keys(s.coTotals || {}).filter(k => k.startsWith("CO"))) : []),
+			...(assessments ? assessments.flatMap(a => Object.keys(a.coMaxMarks || {}).filter(k => k.startsWith("CO"))) : [])
+		])
+	).filter(co => co !== "CO" && co !== "ΣCO" && co !== "total").sort();
+
+	if (coNames.length === 0) {
+		coNames.push("CO1", "CO2", "CO3", "CO4", "CO5", "CO6");
+	}
 
 	const wb = new ExcelJS.Workbook();
 	wb.creator = "NBA System";
@@ -50,31 +68,24 @@ export async function exportAttainmentExcel(opts: AttainmentExportOptions) {
 
 	const ws = wb.addWorksheet("Attainment");
 
-	// Set column widths
+	// Initial column widths
 	ws.getColumn(1).width = 6;
-	ws.getColumn(2).width = 10;
+	ws.getColumn(2).width = 12;
 	ws.getColumn(3).width = 30;
 	ws.getColumn(4).width = 20;
 
-	// Columns E onwards (5-28) = width 4.5
-	for (let col = 5; col <= 28; col++) {
-		ws.getColumn(col).width = 4.5;
-	}
-
-	// Columns AC onwards (29-100) = width 6
-	for (let col = 29; col <= 100; col++) {
-		ws.getColumn(col).width = 6;
-	}
+	const dataCols = 4 + assessments.length * coNames.length + 1 + coNames.length + 1;
+	const totalCols = Math.max(dataCols, 20);
 
 	// Create header sections
 	const rowsNeeded = createAttainmentCriteriaSection(
 		ws,
 		attainmentThresholds
 	);
-	createPassingMarksSection(ws, passingThreshold, coThreshold);
+	createPassingMarksSection(ws, passingThreshold, coThreshold, totalCols);
 
 	const universityRow = rowsNeeded + 1;
-	createUniversitySection(ws, universityRow);
+	createUniversitySection(ws, universityRow, totalCols);
 
 	const infoRow1 = universityRow + 1;
 	const infoRow2 = universityRow + 2;
@@ -87,12 +98,21 @@ export async function exportAttainmentExcel(opts: AttainmentExportOptions) {
 		semester,
 		courseCode,
 		session,
-	});
+	}, totalCols);
 
 	// Create student marks table
 	const tableStartRow = infoRow2 + 1;
 	const { assessmentColumns, totalStartCol, coStartCol, sigmaCoCol } =
-		createTableHeaders(ws, tableStartRow, assessments);
+		createTableHeaders(ws, tableStartRow, assessments, coNames);
+
+	// Set dynamic column widths after finding out headers
+	for (let col = 5; col < totalStartCol; col++) {
+		ws.getColumn(col).width = 5;
+	}
+	ws.getColumn(totalStartCol).width = 8;
+	for (let col = coStartCol; col <= sigmaCoCol; col++) {
+		ws.getColumn(col).width = 8;
+	}
 
 	// Fill student data
 	fillStudentData(
@@ -103,7 +123,8 @@ export async function exportAttainmentExcel(opts: AttainmentExportOptions) {
 		assessmentColumns,
 		totalStartCol,
 		coStartCol,
-		sigmaCoCol
+		sigmaCoCol,
+		coNames
 	);
 
 	// Add CO Attainment tables
@@ -121,27 +142,75 @@ export async function exportAttainmentExcel(opts: AttainmentExportOptions) {
 		passingThreshold,
 		coThreshold,
 		attainmentThresholds,
-		coMaxMarks
+		coMaxMarks,
+		coNames,
+		coStartCol
 	);
 
 	// Create CO Attainment in Absolute Scale table
-	createCOAttainmentAbsoluteScaleTable(
+	const absoluteScaleEndRow = createCOAttainmentAbsoluteScaleTable(
 		ws,
 		pointScaleEndRow + 2, // Leave 1 empty row between tables
 		studentsData,
 		passingThreshold,
 		coThreshold,
 		attainmentThresholds,
-		coMaxMarks
+		coMaxMarks,
+		coNames,
+		coStartCol
 	);
+
+	let nextRow = absoluteScaleEndRow + 2;
+
+	// Render Attainment Weightage Configuration
+	if (directWeightage !== undefined && indirectWeightage !== undefined) {
+		nextRow = createAttainmentWeightageTable(
+			ws,
+			nextRow,
+			directWeightage,
+			indirectWeightage,
+			coStartCol
+		);
+		nextRow += 2; // Leave an empty row
+	}
+
+	// Render Indirect Attainment and Direct vs Indirect vs Final tables if snapshotIndirectData is available
+	if (snapshotIndirectData && snapshotIndirectData.length > 0) {
+		nextRow = createIndirectAttainmentTable(
+			ws,
+			nextRow,
+			snapshotIndirectData,
+			attainmentThresholds,
+			coNames,
+			coStartCol
+		);
+		nextRow += 2; // Leave an empty row
+
+		nextRow = createDirectVsIndirectFinalTable(
+			ws,
+			nextRow,
+			snapshotIndirectData,
+			attainmentThresholds,
+			coNames,
+			coStartCol
+		);
+	}
 
 	// Create CO-PO Mapping table on a separate sheet (only if copoMatrix is provided)
 	if (copoMatrix && Object.keys(copoMatrix).length > 0) {
 		const copoWs = wb.addWorksheet("CO-PO Mapping");
 
-		// Set column widths for CO-PO sheet
+		// Extract unique PO/PSO names from the matrix dynamically to set widths
+		const poSet = new Set<string>();
+		Object.values(copoMatrix).forEach((pos) => {
+			Object.keys(pos).forEach((po) => {
+				poSet.add(po.toUpperCase());
+			});
+		});
+
 		copoWs.getColumn(1).width = 10; // CO labels
-		for (let col = 2; col <= 16; col++) {
+		const poListLength = poSet.size || 15;
+		for (let col = 2; col <= 1 + poListLength; col++) {
 			copoWs.getColumn(col).width = 8; // PO/PSO columns
 		}
 
@@ -152,7 +221,8 @@ export async function exportAttainmentExcel(opts: AttainmentExportOptions) {
 			coThreshold,
 			attainmentThresholds,
 			copoMatrix,
-			coMaxMarks
+			coMaxMarks,
+			coNames
 		);
 	}
 

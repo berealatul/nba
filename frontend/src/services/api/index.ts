@@ -11,6 +11,10 @@ import { hodApi } from "./hod";
 import { staffApi } from "./staff";
 import { deanApi } from "./dean";
 import { facultyApi } from "./faculty";
+import { attainmentApi } from "./attainment";
+import { surveyApi } from "./surveys";
+import { auditApi } from "./audit";
+import { settingsApi } from "./settings";
 
 // Create a unified API service that maintains backward compatibility
 class ApiService {
@@ -22,6 +26,10 @@ class ApiService {
 	getToken = authApi.getToken;
 	setToken = authApi.setToken;
 	clearToken = authApi.clearToken;
+	changePassword = authApi.changePassword;
+	forgotPassword = authApi.forgotPassword;
+	resetPassword = authApi.resetPassword;
+	updateProfile = authApi.updateProfile;
 
 	// Course methods
 	getCourses = coursesApi.getCourses;
@@ -44,6 +52,8 @@ class ApiService {
 	saveBulkMarks = marksApi.saveBulkMarks;
 	getStudentMarks = marksApi.getStudentMarks;
 	getTestMarks = marksApi.getTestMarks;
+	getOfferingAttainment = attainmentApi.getOfferingAttainment;
+	getProgrammeAttainment = attainmentApi.getProgrammeAttainment;
 
 	// Admin methods
 	getAdminStats = adminApi.getStats;
@@ -103,6 +113,14 @@ class ApiService {
 	appointHOD = deanApi.appointHOD;
 	demoteHOD = deanApi.demoteHOD;
 	getHODHistory = deanApi.getHODHistory;
+	createDeanDepartment = deanApi.createDepartment;
+	updateDeanDepartment = deanApi.updateDepartment;
+	deleteDeanDepartment = deanApi.deleteDepartment;
+
+	// Settings methods
+	getPublicSettings = settingsApi.getPublicSettings;
+	updateSettings = settingsApi.updateSettings;
+	uploadLogo = settingsApi.uploadLogo;
 }
 
 // Export a singleton instance for backward compatibility
@@ -117,6 +135,10 @@ export {
 	adminApi,
 	hodApi,
 	facultyApi,
+	attainmentApi,
+	surveyApi,
 	staffApi,
 	deanApi,
+	auditApi,
+	settingsApi,
 };

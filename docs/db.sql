@@ -1,692 +1,1203 @@
--- =============================================
--- NBA DATABASE SCHEMA - WITH COURSE OFFERINGS
--- Version: 4.0
--- Database: nba_db
--- Purpose: Manage courses, tests, and CO-based assessments with assignment-based roles
--- Change from v3: courses are now templates; session-specific data lives in course_offerings
--- Date: February 18, 2026
--- =============================================
+-- MariaDB dump 10.19  Distrib 10.4.32-MariaDB, for Win64 (AMD64)
+--
+-- Host: localhost    Database: nba_db
+-- ------------------------------------------------------
+-- Server version	10.4.32-MariaDB
 
-USE `nba_db`;
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
--- =============================================
--- DROP TABLES (Reverse Dependency Order)
--- =============================================
+--
+-- Table structure for table `action_plans`
+--
 
-SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS `action_plans`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `action_plans` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `offering_id` bigint(20) DEFAULT NULL,
+  `programme_id` int(11) DEFAULT NULL,
+  `batch_id` int(11) DEFAULT NULL,
+  `batch_year` int(11) DEFAULT NULL,
+  `po_name` varchar(5) DEFAULT NULL,
+  `gap_description` text NOT NULL,
+  `action_text` text NOT NULL,
+  `responsible_person` varchar(255) DEFAULT NULL,
+  `target_date` date DEFAULT NULL,
+  `status` enum('Open','In Progress','Completed') DEFAULT 'Open',
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_ap_offering` (`offering_id`),
+  KEY `idx_ap_programme` (`programme_id`),
+  KEY `idx_ap_status` (`status`),
+  KEY `created_by` (`created_by`),
+  KEY `idx_ap_batch` (`batch_id`),
+  CONSTRAINT `action_plans_ibfk_1` FOREIGN KEY (`offering_id`) REFERENCES `course_offerings` (`offering_id`) ON DELETE CASCADE,
+  CONSTRAINT `action_plans_ibfk_2` FOREIGN KEY (`programme_id`) REFERENCES `programmes` (`programme_id`) ON DELETE CASCADE,
+  CONSTRAINT `action_plans_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `users` (`employee_id`) ON DELETE SET NULL,
+  CONSTRAINT `action_plans_ibfk_4` FOREIGN KEY (`batch_id`) REFERENCES `programme_batches` (`batch_id`) ON DELETE SET NULL
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `action_plans`
+--
+
+LOCK TABLES `action_plans` WRITE;
+/*!40000 ALTER TABLE `action_plans` DISABLE KEYS */;
+/*!40000 ALTER TABLE `action_plans` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `attainment_scale`
+--
+
+DROP TABLE IF EXISTS `attainment_scale`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `attainment_scale` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `offering_id` bigint(20) NOT NULL,
+  `level` smallint(6) NOT NULL CHECK (`level` >= 0 and `level` <= 10),
+  `min_percentage` decimal(5,2) NOT NULL CHECK (`min_percentage` >= 0 and `min_percentage` <= 100),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `offering_id` (`offering_id`,`level`),
+  KEY `offering_id_2` (`offering_id`),
+  CONSTRAINT `attainment_scale_ibfk_1` FOREIGN KEY (`offering_id`) REFERENCES `course_offerings` (`offering_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `attainment_scale`
+--
+
+LOCK TABLES `attainment_scale` WRITE;
+/*!40000 ALTER TABLE `attainment_scale` DISABLE KEYS */;
+/*!40000 ALTER TABLE `attainment_scale` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `audit_logs`
+--
+
+DROP TABLE IF EXISTS `audit_logs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `audit_logs` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) DEFAULT NULL,
+  `action` enum('CREATE','UPDATE','DELETE','LOGIN') NOT NULL,
+  `entity_type` varchar(50) NOT NULL,
+  `entity_id` varchar(50) NOT NULL,
+  `old_values` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`old_values`)),
+  `new_values` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`new_values`)),
+  `ip_address` varchar(45) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_entity` (`entity_type`,`entity_id`),
+  KEY `idx_user` (`user_id`),
+  KEY `idx_action` (`action`),
+  CONSTRAINT `audit_logs_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`employee_id`) ON DELETE SET NULL
+) ENGINE=InnoDB AUTO_INCREMENT=687 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `audit_logs`
+--
+
+LOCK TABLES `audit_logs` WRITE;
+/*!40000 ALTER TABLE `audit_logs` DISABLE KEYS */;
+/*!40000 ALTER TABLE `audit_logs` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `co_po_mapping`
+--
+
+DROP TABLE IF EXISTS `co_po_mapping`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `co_po_mapping` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `offering_id` bigint(20) NOT NULL,
+  `co_number` tinyint(4) NOT NULL CHECK (`co_number` between 1 and 6),
+  `po_name` varchar(5) NOT NULL,
+  `value` tinyint(4) NOT NULL DEFAULT 0 CHECK (`value` between 0 and 3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_mapping` (`offering_id`,`co_number`,`po_name`),
+  CONSTRAINT `co_po_mapping_ibfk_1` FOREIGN KEY (`offering_id`) REFERENCES `course_offerings` (`offering_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=90 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `co_po_mapping`
+--
+
+LOCK TABLES `co_po_mapping` WRITE;
+/*!40000 ALTER TABLE `co_po_mapping` DISABLE KEYS */;
+/*!40000 ALTER TABLE `co_po_mapping` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `course_faculty_assignments`
+--
+
+DROP TABLE IF EXISTS `course_faculty_assignments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `course_faculty_assignments` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `offering_id` bigint(20) NOT NULL,
+  `employee_id` int(11) NOT NULL,
+  `assignment_type` enum('Primary','Co-instructor','Lab') DEFAULT 'Primary',
+  `assigned_date` date DEFAULT (curdate()),
+  `completion_date` date DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_offering_emp_type` (`offering_id`,`employee_id`,`assignment_type`),
+  KEY `idx_offering` (`offering_id`),
+  KEY `idx_emp_active` (`employee_id`,`is_active`),
+  CONSTRAINT `course_faculty_assignments_ibfk_1` FOREIGN KEY (`offering_id`) REFERENCES `course_offerings` (`offering_id`) ON DELETE CASCADE,
+  CONSTRAINT `course_faculty_assignments_ibfk_2` FOREIGN KEY (`employee_id`) REFERENCES `users` (`employee_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `course_faculty_assignments`
+--
+
+LOCK TABLES `course_faculty_assignments` WRITE;
+/*!40000 ALTER TABLE `course_faculty_assignments` DISABLE KEYS */;
+/*!40000 ALTER TABLE `course_faculty_assignments` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `course_offerings`
+--
+
+DROP TABLE IF EXISTS `course_offerings`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `course_offerings` (
+  `offering_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `course_id` bigint(20) NOT NULL,
+  `year` int(11) NOT NULL CHECK (`year` between 1000 and 9999),
+  `semester` enum('Spring','Autumn') NOT NULL,
+  `co_threshold` decimal(5,2) DEFAULT 40.00 CHECK (`co_threshold` >= 0 and `co_threshold` <= 100),
+  `passing_threshold` decimal(5,2) DEFAULT 30.00 CHECK (`passing_threshold` >= 0 and `passing_threshold` <= 100),
+  `syllabus_pdf` longblob DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `direct_weightage` decimal(5,2) DEFAULT 80.00 CHECK (`direct_weightage` >= 0 and `direct_weightage` <= 100),
+  `indirect_weightage` decimal(5,2) DEFAULT 20.00 CHECK (`indirect_weightage` >= 0 and `indirect_weightage` <= 100),
+  PRIMARY KEY (`offering_id`),
+  UNIQUE KEY `uk_course_year_sem` (`course_id`,`year`,`semester`),
+  KEY `year` (`year`,`semester`),
+  KEY `course_id` (`course_id`),
+  CONSTRAINT `course_offerings_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `course_offerings`
+--
+
+LOCK TABLES `course_offerings` WRITE;
+/*!40000 ALTER TABLE `course_offerings` DISABLE KEYS */;
+/*!40000 ALTER TABLE `course_offerings` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `course_survey_questions`
+--
+
+DROP TABLE IF EXISTS `course_survey_questions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `course_survey_questions` (
+  `question_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `survey_id` bigint(20) NOT NULL,
+  `question_number` smallint(6) NOT NULL,
+  `question_text` text NOT NULL,
+  `co_number` tinyint(4) NOT NULL CHECK (`co_number` between 1 and 6),
+  `mapping_weight` decimal(3,2) NOT NULL DEFAULT 1.00 CHECK (`mapping_weight` between 0.00 and 1.00),
+  PRIMARY KEY (`question_id`),
+  UNIQUE KEY `uk_survey_qnum` (`survey_id`,`question_number`),
+  CONSTRAINT `course_survey_questions_ibfk_1` FOREIGN KEY (`survey_id`) REFERENCES `course_surveys` (`survey_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `course_survey_questions`
+--
+
+LOCK TABLES `course_survey_questions` WRITE;
+/*!40000 ALTER TABLE `course_survey_questions` DISABLE KEYS */;
+/*!40000 ALTER TABLE `course_survey_questions` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `course_survey_responses`
+--
+
+DROP TABLE IF EXISTS `course_survey_responses`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `course_survey_responses` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `survey_id` bigint(20) NOT NULL,
+  `student_rollno` varchar(20) NOT NULL,
+  `question_id` bigint(20) NOT NULL,
+  `likert_rating` tinyint(4) NOT NULL CHECK (`likert_rating` between 1 and 5),
+  `imported_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_student_question` (`survey_id`,`student_rollno`,`question_id`),
+  KEY `student_rollno` (`student_rollno`),
+  KEY `question_id` (`question_id`),
+  CONSTRAINT `course_survey_responses_ibfk_1` FOREIGN KEY (`survey_id`) REFERENCES `course_surveys` (`survey_id`) ON DELETE CASCADE,
+  CONSTRAINT `course_survey_responses_ibfk_2` FOREIGN KEY (`student_rollno`) REFERENCES `students` (`roll_no`) ON DELETE CASCADE,
+  CONSTRAINT `course_survey_responses_ibfk_3` FOREIGN KEY (`question_id`) REFERENCES `course_survey_questions` (`question_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=101 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `course_survey_responses`
+--
+
+LOCK TABLES `course_survey_responses` WRITE;
+/*!40000 ALTER TABLE `course_survey_responses` DISABLE KEYS */;
+/*!40000 ALTER TABLE `course_survey_responses` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `course_surveys`
+--
+
+DROP TABLE IF EXISTS `course_surveys`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `course_surveys` (
+  `survey_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `offering_id` bigint(20) NOT NULL,
+  `title` varchar(255) DEFAULT 'Course Exit Survey',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`survey_id`),
+  KEY `offering_id` (`offering_id`),
+  CONSTRAINT `course_surveys_ibfk_1` FOREIGN KEY (`offering_id`) REFERENCES `course_offerings` (`offering_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `course_surveys`
+--
+
+LOCK TABLES `course_surveys` WRITE;
+/*!40000 ALTER TABLE `course_surveys` DISABLE KEYS */;
+/*!40000 ALTER TABLE `course_surveys` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `courses`
+--
+
+DROP TABLE IF EXISTS `courses`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `courses` (
+  `course_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `course_code` varchar(20) NOT NULL,
+  `department_id` int(11) DEFAULT NULL,
+  `course_name` varchar(255) NOT NULL,
+  `course_type` enum('Theory','Lab','Project','Seminar') DEFAULT 'Theory',
+  `course_level` enum('Undergraduate','Postgraduate','UG & PG') DEFAULT 'Undergraduate',
+  `is_active` tinyint(1) DEFAULT 1,
+  `credit` smallint(6) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`course_id`),
+  UNIQUE KEY `course_code` (`course_code`),
+  KEY `idx_course_dept` (`department_id`),
+  CONSTRAINT `courses_ibfk_1` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `courses`
+--
+
+LOCK TABLES `courses` WRITE;
+/*!40000 ALTER TABLE `courses` DISABLE KEYS */;
+/*!40000 ALTER TABLE `courses` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `dean_assignments`
+--
+
+DROP TABLE IF EXISTS `dean_assignments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `dean_assignments` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `school_id` int(11) NOT NULL,
+  `employee_id` int(11) NOT NULL,
+  `start_date` date NOT NULL,
+  `end_date` date DEFAULT NULL,
+  `appointment_order` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_school_emp_start` (`school_id`,`employee_id`,`start_date`),
+  KEY `idx_school_active` (`school_id`,`end_date`),
+  KEY `idx_employee` (`employee_id`),
+  KEY `idx_dates` (`start_date`,`end_date`),
+  CONSTRAINT `dean_assignments_ibfk_1` FOREIGN KEY (`school_id`) REFERENCES `schools` (`school_id`) ON DELETE CASCADE,
+  CONSTRAINT `dean_assignments_ibfk_2` FOREIGN KEY (`employee_id`) REFERENCES `users` (`employee_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `dean_assignments`
+--
+
+LOCK TABLES `dean_assignments` WRITE;
+/*!40000 ALTER TABLE `dean_assignments` DISABLE KEYS */;
+INSERT INTO `dean_assignments` VALUES (1,1,8000001,'2026-01-01',NULL,'APT/2026/DEAN/SOE/001','2026-05-15 17:09:05');
+/*!40000 ALTER TABLE `dean_assignments` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `departments`
+--
+
+DROP TABLE IF EXISTS `departments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `departments` (
+  `department_id` int(11) NOT NULL AUTO_INCREMENT,
+  `school_id` int(11) DEFAULT NULL,
+  `department_name` varchar(100) NOT NULL,
+  `department_code` varchar(10) NOT NULL,
+  `description` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`department_id`),
+  UNIQUE KEY `department_name` (`department_name`),
+  UNIQUE KEY `department_code` (`department_code`),
+  KEY `school_id` (`school_id`),
+  CONSTRAINT `departments_ibfk_1` FOREIGN KEY (`school_id`) REFERENCES `schools` (`school_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `departments`
+--
+
+LOCK TABLES `departments` WRITE;
+/*!40000 ALTER TABLE `departments` DISABLE KEYS */;
+/*!40000 ALTER TABLE `departments` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `enrollments`
+--
+
+DROP TABLE IF EXISTS `enrollments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `enrollments` (
+  `enrollment_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `offering_id` bigint(20) NOT NULL,
+  `enrollment_status` enum('Enrolled','Dropped','Completed') DEFAULT 'Enrolled',
+  `enrolled_date` date DEFAULT (curdate()),
+  `student_rollno` varchar(20) NOT NULL,
+  `enrolled_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `is_repeater` tinyint(1) DEFAULT 0,
+  PRIMARY KEY (`enrollment_id`),
+  UNIQUE KEY `offering_id` (`offering_id`,`student_rollno`),
+  KEY `offering_id_2` (`offering_id`),
+  KEY `student_rollno` (`student_rollno`),
+  CONSTRAINT `enrollments_ibfk_1` FOREIGN KEY (`offering_id`) REFERENCES `course_offerings` (`offering_id`) ON DELETE CASCADE,
+  CONSTRAINT `enrollments_ibfk_2` FOREIGN KEY (`student_rollno`) REFERENCES `students` (`roll_no`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=189 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `enrollments`
+--
+
+LOCK TABLES `enrollments` WRITE;
+/*!40000 ALTER TABLE `enrollments` DISABLE KEYS */;
+/*!40000 ALTER TABLE `enrollments` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `hod_assignments`
+--
+
+DROP TABLE IF EXISTS `hod_assignments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `hod_assignments` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `department_id` int(11) NOT NULL,
+  `employee_id` int(11) NOT NULL,
+  `start_date` date NOT NULL,
+  `end_date` date DEFAULT NULL,
+  `appointment_order` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_dept_emp_start` (`department_id`,`employee_id`,`start_date`),
+  KEY `idx_dept_active` (`department_id`,`end_date`),
+  KEY `idx_employee` (`employee_id`),
+  KEY `idx_dates` (`start_date`,`end_date`),
+  CONSTRAINT `hod_assignments_ibfk_1` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE CASCADE,
+  CONSTRAINT `hod_assignments_ibfk_2` FOREIGN KEY (`employee_id`) REFERENCES `users` (`employee_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `hod_assignments`
+--
+
+LOCK TABLES `hod_assignments` WRITE;
+/*!40000 ALTER TABLE `hod_assignments` DISABLE KEYS */;
+/*!40000 ALTER TABLE `hod_assignments` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `marks`
+--
+
+DROP TABLE IF EXISTS `marks`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `marks` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `student_roll_no` varchar(20) NOT NULL,
+  `test_id` bigint(20) NOT NULL,
+  `co_number` tinyint(4) NOT NULL CHECK (`co_number` between 1 and 6),
+  `marks_obtained` decimal(6,2) NOT NULL DEFAULT 0.00 CHECK (`marks_obtained` >= 0),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_student_test_co` (`student_roll_no`,`test_id`,`co_number`),
+  KEY `test_id` (`test_id`),
+  CONSTRAINT `marks_ibfk_1` FOREIGN KEY (`student_roll_no`) REFERENCES `students` (`roll_no`) ON DELETE CASCADE,
+  CONSTRAINT `marks_ibfk_2` FOREIGN KEY (`test_id`) REFERENCES `tests` (`test_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=4627 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `marks`
+--
+
+LOCK TABLES `marks` WRITE;
+/*!40000 ALTER TABLE `marks` DISABLE KEYS */;
+/*!40000 ALTER TABLE `marks` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `offering_co_attainment`
+--
+
+DROP TABLE IF EXISTS `offering_co_attainment`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `offering_co_attainment` (
+  `offering_id` bigint(20) NOT NULL,
+  `co_number` tinyint(4) NOT NULL CHECK (`co_number` between 1 and 6),
+  `attainment_percentage` decimal(5,2) NOT NULL DEFAULT 0.00,
+  `attainment_level` decimal(5,2) NOT NULL DEFAULT 0.00,
+  `indirect_attainment_percentage` decimal(5,2) DEFAULT NULL,
+  `indirect_attainment_level` decimal(5,2) DEFAULT NULL,
+  `final_attainment_percentage` decimal(5,2) DEFAULT NULL,
+  `final_attainment_level` decimal(5,2) DEFAULT NULL,
+  `calculated_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`offering_id`,`co_number`),
+  KEY `idx_oca_offering` (`offering_id`),
+  CONSTRAINT `offering_co_attainment_ibfk_1` FOREIGN KEY (`offering_id`) REFERENCES `course_offerings` (`offering_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `offering_co_attainment`
+--
+
+LOCK TABLES `offering_co_attainment` WRITE;
+/*!40000 ALTER TABLE `offering_co_attainment` DISABLE KEYS */;
+/*!40000 ALTER TABLE `offering_co_attainment` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `offering_po_attainment`
+--
+
+DROP TABLE IF EXISTS `offering_po_attainment`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `offering_po_attainment` (
+  `offering_id` bigint(20) NOT NULL,
+  `po_name` varchar(5) NOT NULL,
+  `attainment_value` decimal(5,2) NOT NULL DEFAULT 0.00,
+  `indirect_attainment_value` decimal(5,2) DEFAULT NULL,
+  `final_attainment_value` decimal(5,2) DEFAULT NULL,
+  `calculated_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`offering_id`,`po_name`),
+  KEY `idx_opa_offering` (`offering_id`),
+  KEY `idx_opa_po_name` (`po_name`),
+  CONSTRAINT `offering_po_attainment_ibfk_1` FOREIGN KEY (`offering_id`) REFERENCES `course_offerings` (`offering_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `offering_po_attainment`
+--
+
+LOCK TABLES `offering_po_attainment` WRITE;
+/*!40000 ALTER TABLE `offering_po_attainment` DISABLE KEYS */;
+/*!40000 ALTER TABLE `offering_po_attainment` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `programme_batch_attainments`
+--
+
+DROP TABLE IF EXISTS `programme_batch_attainments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `programme_batch_attainments` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `programme_id` int(11) NOT NULL,
+  `batch_id` int(11) DEFAULT NULL,
+  `batch_year` int(11) NOT NULL,
+  `po_name` varchar(5) NOT NULL,
+  `direct_attainment` decimal(5,2) DEFAULT 0.00,
+  `indirect_attainment` decimal(5,2) DEFAULT 0.00,
+  `final_attainment` decimal(5,2) DEFAULT 0.00,
+  `target` decimal(5,2) DEFAULT 0.00,
+  `calculated_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_programme_batch_po` (`programme_id`,`batch_year`,`po_name`),
+  KEY `idx_pba_batch` (`batch_id`),
+  CONSTRAINT `programme_batch_attainments_ibfk_1` FOREIGN KEY (`programme_id`) REFERENCES `programmes` (`programme_id`) ON DELETE CASCADE,
+  CONSTRAINT `programme_batch_attainments_ibfk_2` FOREIGN KEY (`batch_id`) REFERENCES `programme_batches` (`batch_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=205 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `programme_batch_attainments`
+--
+
+LOCK TABLES `programme_batch_attainments` WRITE;
+/*!40000 ALTER TABLE `programme_batch_attainments` DISABLE KEYS */;
+/*!40000 ALTER TABLE `programme_batch_attainments` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `programme_batches`
+--
+
+DROP TABLE IF EXISTS `programme_batches`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `programme_batches` (
+  `batch_id` int(11) NOT NULL AUTO_INCREMENT,
+  `programme_id` int(11) NOT NULL,
+  `batch_year` int(11) NOT NULL,
+  `coordinator_id` int(11) DEFAULT NULL,
+  `status` enum('upcoming','active','completed') DEFAULT 'upcoming',
+  `start_date` date DEFAULT NULL,
+  `end_date` date DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`batch_id`),
+  UNIQUE KEY `uk_programme_batch` (`programme_id`,`batch_year`),
+  KEY `idx_pb_programme` (`programme_id`),
+  KEY `idx_pb_coordinator` (`coordinator_id`),
+  CONSTRAINT `programme_batches_ibfk_1` FOREIGN KEY (`programme_id`) REFERENCES `programmes` (`programme_id`) ON DELETE CASCADE,
+  CONSTRAINT `programme_batches_ibfk_2` FOREIGN KEY (`coordinator_id`) REFERENCES `users` (`employee_id`) ON DELETE SET NULL
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `programme_batches`
+--
+
+LOCK TABLES `programme_batches` WRITE;
+/*!40000 ALTER TABLE `programme_batches` DISABLE KEYS */;
+/*!40000 ALTER TABLE `programme_batches` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `programme_courses`
+--
+
+DROP TABLE IF EXISTS `programme_courses`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `programme_courses` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `programme_id` int(11) NOT NULL,
+  `course_id` bigint(20) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_programme_course` (`programme_id`,`course_id`),
+  KEY `idx_pc_programme` (`programme_id`),
+  KEY `idx_pc_course` (`course_id`),
+  CONSTRAINT `programme_courses_ibfk_1` FOREIGN KEY (`programme_id`) REFERENCES `programmes` (`programme_id`) ON DELETE CASCADE,
+  CONSTRAINT `programme_courses_ibfk_2` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `programme_courses`
+--
+
+LOCK TABLES `programme_courses` WRITE;
+/*!40000 ALTER TABLE `programme_courses` DISABLE KEYS */;
+/*!40000 ALTER TABLE `programme_courses` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `programmes`
+--
+
+DROP TABLE IF EXISTS `programmes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `programmes` (
+  `programme_id` int(11) NOT NULL AUTO_INCREMENT,
+  `department_id` int(11) NOT NULL,
+  `programme_code` varchar(20) NOT NULL,
+  `programme_name` varchar(150) NOT NULL,
+  `degree_level` enum('UG','PG','Diploma','PhD') NOT NULL DEFAULT 'UG',
+  `duration_years` tinyint(4) NOT NULL DEFAULT 4,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `direct_weightage` decimal(5,2) DEFAULT 80.00 CHECK (`direct_weightage` >= 0 and `direct_weightage` <= 100),
+  `indirect_weightage` decimal(5,2) DEFAULT 20.00 CHECK (`indirect_weightage` >= 0 and `indirect_weightage` <= 100),
+  PRIMARY KEY (`programme_id`),
+  UNIQUE KEY `uk_programme_code` (`programme_code`),
+  UNIQUE KEY `uk_programme_name` (`programme_name`),
+  KEY `idx_programme_dept` (`department_id`),
+  CONSTRAINT `programmes_ibfk_1` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `programmes`
+--
+
+LOCK TABLES `programmes` WRITE;
+/*!40000 ALTER TABLE `programmes` DISABLE KEYS */;
+/*!40000 ALTER TABLE `programmes` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `questions`
+--
+
+DROP TABLE IF EXISTS `questions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `questions` (
+  `question_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `test_id` bigint(20) NOT NULL,
+  `question_number` smallint(6) NOT NULL CHECK (`question_number` between 1 and 20),
+  `sub_question` varchar(10) DEFAULT NULL,
+  `is_optional` tinyint(1) DEFAULT 0,
+  `co` smallint(6) NOT NULL CHECK (`co` between 1 and 6),
+  `max_marks` decimal(5,2) NOT NULL CHECK (`max_marks` >= 0.5),
+  PRIMARY KEY (`question_id`),
+  UNIQUE KEY `test_id_3` (`test_id`,`question_number`,`sub_question`),
+  KEY `test_id` (`test_id`),
+  KEY `test_id_2` (`test_id`,`question_number`),
+  CONSTRAINT `questions_ibfk_1` FOREIGN KEY (`test_id`) REFERENCES `tests` (`test_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=61 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `questions`
+--
+
+LOCK TABLES `questions` WRITE;
+/*!40000 ALTER TABLE `questions` DISABLE KEYS */;
+/*!40000 ALTER TABLE `questions` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `raw_marks`
+--
 
 DROP TABLE IF EXISTS `raw_marks`;
-DROP TABLE IF EXISTS `marks`;
-DROP TABLE IF EXISTS `enrollments`;
-DROP TABLE IF EXISTS `questions`;
-DROP TABLE IF EXISTS `tests`;
-DROP TABLE IF EXISTS `co_po_mapping`;
-DROP TABLE IF EXISTS `attainment_scale`;
-DROP TABLE IF EXISTS `course_faculty_assignments`;
-DROP TABLE IF EXISTS `course_offerings`;
-DROP TABLE IF EXISTS `courses`;
-DROP TABLE IF EXISTS `students`;
-DROP TABLE IF EXISTS `hod_assignments`;
-DROP TABLE IF EXISTS `dean_assignments`;
-DROP TABLE IF EXISTS `users`;
-DROP TABLE IF EXISTS `departments`;
-DROP TABLE IF EXISTS `schools`;
-
-DROP VIEW IF EXISTS `v_current_hods`;
-DROP VIEW IF EXISTS `v_current_deans`;
-DROP VIEW IF EXISTS `v_current_offerings`;
-
-SET FOREIGN_KEY_CHECKS = 1;
-
--- =============================================
--- CORE TABLES
--- =============================================
-
--- Schools (grouping of departments)
-CREATE TABLE `schools` (
-    `school_id` INT(11) NOT NULL AUTO_INCREMENT,
-    `school_code` VARCHAR(10) NOT NULL,
-    `school_name` VARCHAR(150) NOT NULL,
-    `description` TEXT NULL,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`school_id`),
-    UNIQUE KEY `uk_school_code` (`school_code`),
-    UNIQUE KEY `uk_school_name` (`school_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Departments
-CREATE TABLE `departments` (
-    `department_id` INT(11) NOT NULL AUTO_INCREMENT,
-    `school_id` INT(11) NULL,
-    `department_name` VARCHAR(100) NOT NULL,
-    `department_code` VARCHAR(10) NOT NULL,
-    `description` TEXT NULL,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`department_id`),
-    UNIQUE KEY (`department_name`),
-    UNIQUE KEY (`department_code`),
-    INDEX (`school_id`),
-    FOREIGN KEY (`school_id`) REFERENCES `schools`(`school_id`) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Users (Admin, Faculty, HOD, Staff)
--- Note: HOD has its own role with a dedicated login credential per department.
--- Dean roles are still managed via assignment tables.
-CREATE TABLE `users` (
-    `employee_id` INT(11) NOT NULL,
-    `username` VARCHAR(64) NOT NULL,
-    `email` VARCHAR(64) NOT NULL,
-    `password_hash` VARCHAR(255) NOT NULL,
-    `role` ENUM('admin', 'faculty', 'hod', 'staff') NOT NULL,
-    `department_id` INT(11) NULL,
-    `designation` VARCHAR(50) NULL,
-    `phone` VARCHAR(15) NULL,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`employee_id`),
-    UNIQUE KEY (`email`),
-    INDEX (`department_id`),
-    FOREIGN KEY (`department_id`) REFERENCES `departments`(`department_id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- HOD Assignments (Historical tracking of HOD appointments)
--- Normalization fix: is_current removed — it is fully derived from (end_date IS NULL).
--- All queries use WHERE end_date IS NULL for the current record. SELECT returns it computed.
-CREATE TABLE `hod_assignments` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `department_id` INT(11) NOT NULL,
-    `employee_id` INT(11) NOT NULL,
-    `start_date` DATE NOT NULL,
-    `end_date` DATE NULL,
-    `appointment_order` VARCHAR(50) NULL,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_dept_emp_start` (`department_id`, `employee_id`, `start_date`),
-    INDEX `idx_dept_active` (`department_id`, `end_date`),
-    INDEX `idx_employee` (`employee_id`),
-    INDEX `idx_dates` (`start_date`, `end_date`),
-    FOREIGN KEY (`department_id`) REFERENCES `departments`(`department_id`) ON DELETE CASCADE,
-    FOREIGN KEY (`employee_id`) REFERENCES `users`(`employee_id`) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Dean Assignments (Historical tracking of Dean appointments)
--- Normalization fix: is_current removed — derived from (end_date IS NULL).
-CREATE TABLE `dean_assignments` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `school_id` INT(11) NOT NULL,
-    `employee_id` INT(11) NOT NULL,
-    `start_date` DATE NOT NULL,
-    `end_date` DATE NULL,
-    `appointment_order` VARCHAR(50) NULL,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_school_emp_start` (`school_id`, `employee_id`, `start_date`),
-    INDEX `idx_school_active` (`school_id`, `end_date`),
-    INDEX `idx_employee` (`employee_id`),
-    INDEX `idx_dates` (`start_date`, `end_date`),
-    FOREIGN KEY (`school_id`) REFERENCES `schools`(`school_id`) ON DELETE CASCADE,
-    FOREIGN KEY (`employee_id`) REFERENCES `users`(`employee_id`) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Students
-CREATE TABLE `students` (
-    `roll_no` VARCHAR(20) NOT NULL,
-    `student_name` VARCHAR(100) NOT NULL,
-    `department_id` INT(11) NOT NULL,
-    `batch_year` INT NULL,
-    `student_status` ENUM('Active', 'Graduated', 'Dropped') DEFAULT 'Active',
-    `email` VARCHAR(100) NULL,
-    `phone` VARCHAR(15) NULL,
-    PRIMARY KEY (`roll_no`),
-    INDEX `idx_students_dept` (`department_id`),
-    FOREIGN KEY (`department_id`) REFERENCES `departments`(`department_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =============================================
--- COURSE + OFFERING TABLES
--- =============================================
-
--- Courses (TEMPLATE — no session-specific data)
-CREATE TABLE `courses` (
-    `course_id` BIGINT NOT NULL AUTO_INCREMENT,
-    `course_code` VARCHAR(20) NOT NULL,
-    `department_id` INT(11) NULL,
-    `course_name` VARCHAR(255) NOT NULL,
-    `course_type` ENUM('Theory', 'Lab', 'Project', 'Seminar') DEFAULT 'Theory',
-    `course_level` ENUM('Undergraduate', 'Postgraduate', 'UG & PG') DEFAULT 'Undergraduate',
-    `is_active` TINYINT(1) DEFAULT 1,
-    `credit` SMALLINT NOT NULL DEFAULT 0,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`course_id`),
-    UNIQUE KEY (`course_code`),
-    INDEX `idx_course_dept` (`department_id`),
-    FOREIGN KEY (`department_id`) REFERENCES `departments`(`department_id`) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Course Offerings (SESSION INSTANCE of a course — year/semester specific)
--- Previously this data lived on the courses table directly.
-CREATE TABLE `course_offerings` (
-    `offering_id` BIGINT NOT NULL AUTO_INCREMENT,
-    `course_id` BIGINT NOT NULL,
-    `year` INT NOT NULL CHECK (`year` BETWEEN 1000 AND 9999),
-    `semester` ENUM('Spring', 'Autumn') NOT NULL,
-    `co_threshold` DECIMAL(5, 2) DEFAULT 40.00 CHECK (`co_threshold` >= 0 AND `co_threshold` <= 100),
-    `passing_threshold` DECIMAL(5, 2) DEFAULT 60.00 CHECK (`passing_threshold` >= 0 AND `passing_threshold` <= 100),
-    `syllabus_pdf` LONGBLOB,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`offering_id`),
-    UNIQUE KEY `uk_course_year_sem` (`course_id`, `year`, `semester`),
-    INDEX (`year`, `semester`),
-    INDEX (`course_id`),
-    FOREIGN KEY (`course_id`) REFERENCES `courses`(`course_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Course Faculty Assignments (tracks which faculty teaches which offering)
--- Changed: references offering_id instead of course_id + year + semester
-CREATE TABLE `course_faculty_assignments` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `offering_id` BIGINT NOT NULL,
-    `employee_id` INT(11) NOT NULL,
-    `assignment_type` ENUM('Primary', 'Co-instructor', 'Lab') DEFAULT 'Primary',
-    `assigned_date` DATE DEFAULT (CURRENT_DATE),
-    `completion_date` DATE NULL,
-    `is_active` TINYINT(1) DEFAULT 1,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_offering_emp_type` (`offering_id`, `employee_id`, `assignment_type`),
-    INDEX `idx_offering` (`offering_id`),
-    INDEX `idx_emp_active` (`employee_id`, `is_active`),
-    FOREIGN KEY (`offering_id`) REFERENCES `course_offerings`(`offering_id`) ON DELETE CASCADE,
-    FOREIGN KEY (`employee_id`) REFERENCES `users`(`employee_id`) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =============================================
--- ASSESSMENT TABLES (unchanged structure)
--- =============================================
-
--- Attainment Scale (configurable thresholds per course)
-CREATE TABLE `attainment_scale` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `course_id` BIGINT NOT NULL,
-    `level` SMALLINT NOT NULL CHECK (`level` >= 0 AND `level` <= 10),
-    `min_percentage` DECIMAL(5, 2) NOT NULL CHECK (`min_percentage` >= 0 AND `min_percentage` <= 100),
-    PRIMARY KEY (`id`),
-    UNIQUE KEY (`course_id`, `level`),
-    INDEX (`course_id`),
-    FOREIGN KEY (`course_id`) REFERENCES `courses`(`course_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- CO-PO Mapping Table
--- Normalization fix: co_name VARCHAR replaced with co_number TINYINT to match questions.co type.
--- Repository returns CONCAT('CO', co_number) AS co_name for API backward compatibility.
-CREATE TABLE `co_po_mapping` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `course_id` BIGINT NOT NULL,
-    `co_number` TINYINT NOT NULL CHECK (`co_number` BETWEEN 1 AND 6),
-    `po_name` VARCHAR(5) NOT NULL,  -- PO1..PO12, PSO1..PSO3
-    `value` TINYINT NOT NULL DEFAULT 0 CHECK (`value` BETWEEN 0 AND 3),
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `unique_mapping` (`course_id`, `co_number`, `po_name`),
-    FOREIGN KEY (`course_id`) REFERENCES `courses`(`course_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Tests (references offering_id — a test belongs to a specific offering, not the template)
--- Redundancy fix: max_marks removed — it duplicated full_marks in all recorded data.
--- full_marks (INT NOT NULL) is the single authoritative column for total marks.
-CREATE TABLE `tests` (
-    `test_id` BIGINT NOT NULL AUTO_INCREMENT,
-    `offering_id` BIGINT NOT NULL,
-    `test_name` VARCHAR(100) NOT NULL,
-    `test_type` ENUM('Mid Sem', 'End Sem', 'Assignment', 'Quiz') NULL,
-    `test_date` DATE NULL,
-    `weightage` DECIMAL(5,2) NULL,
-    `full_marks` INT NOT NULL CHECK (`full_marks` > 0),
-    `pass_marks` INT NOT NULL CHECK (`pass_marks` >= 0),
-    `question_paper_pdf` LONGBLOB,
-    PRIMARY KEY (`test_id`),
-    INDEX (`offering_id`),
-    FOREIGN KEY (`offering_id`) REFERENCES `course_offerings`(`offering_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Questions (supports main question, sub-questions, optional)
-CREATE TABLE `questions` (
-    `question_id` BIGINT NOT NULL AUTO_INCREMENT,
-    `test_id` BIGINT NOT NULL,
-    `question_number` SMALLINT NOT NULL CHECK (`question_number` BETWEEN 1 AND 20),
-    `sub_question` VARCHAR(10) DEFAULT NULL,  -- a-h or NULL
-    `is_optional` BOOLEAN DEFAULT FALSE,  -- for "Attempt either A OR B"
-    `co` SMALLINT NOT NULL CHECK (`co` BETWEEN 1 AND 6),
-    `max_marks` DECIMAL(5, 2) NOT NULL CHECK (`max_marks` >= 0.5),
-    PRIMARY KEY (`question_id`),
-    INDEX (`test_id`),
-    INDEX (`test_id`, `question_number`),
-    UNIQUE KEY (`test_id`, `question_number`, `sub_question`),
-    FOREIGN KEY (`test_id`) REFERENCES `tests`(`test_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Course Enrollment (references offering_id — enrollment is per offering)
-CREATE TABLE `enrollments` (
-    `enrollment_id` BIGINT NOT NULL AUTO_INCREMENT,
-    `offering_id` BIGINT NOT NULL,
-    `enrollment_status` ENUM('Enrolled', 'Dropped', 'Completed') DEFAULT 'Enrolled',
-    `enrolled_date` DATE DEFAULT (CURRENT_DATE),
-    `student_rollno` VARCHAR(20) NOT NULL,
-    `enrolled_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`enrollment_id`),
-    UNIQUE KEY (`offering_id`, `student_rollno`),
-    INDEX (`offering_id`),
-    INDEX (`student_rollno`),
-    FOREIGN KEY (`offering_id`) REFERENCES `course_offerings`(`offering_id`) ON DELETE CASCADE,
-    FOREIGN KEY (`student_rollno`) REFERENCES `students`(`roll_no`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Raw Marks (per-question scores, dropped every semester)
--- 3NF fix: test_id removed — it was transitively determined by question_id → questions.test_id.
--- Queries that need test_id join via questions table.
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `raw_marks` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `student_id` VARCHAR(20) NOT NULL,
-    `question_id` BIGINT NOT NULL,
-    `marks_obtained` DECIMAL(5, 2) NOT NULL CHECK (`marks_obtained` >= 0),
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_student_question` (`student_id`, `question_id`),
-    INDEX (`question_id`),
-    INDEX (`student_id`),
-    FOREIGN KEY (`student_id`) REFERENCES `students`(`roll_no`) ON DELETE CASCADE,
-    FOREIGN KEY (`question_id`) REFERENCES `questions`(`question_id`) ON DELETE CASCADE
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `student_id` varchar(20) NOT NULL,
+  `question_id` bigint(20) NOT NULL,
+  `marks_obtained` decimal(5,2) NOT NULL CHECK (`marks_obtained` >= 0),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_student_question` (`student_id`,`question_id`),
+  KEY `question_id` (`question_id`),
+  KEY `student_id` (`student_id`),
+  CONSTRAINT `raw_marks_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`roll_no`) ON DELETE CASCADE,
+  CONSTRAINT `raw_marks_ibfk_2` FOREIGN KEY (`question_id`) REFERENCES `questions` (`question_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=286 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `raw_marks`
+--
+
+LOCK TABLES `raw_marks` WRITE;
+/*!40000 ALTER TABLE `raw_marks` DISABLE KEYS */;
+/*!40000 ALTER TABLE `raw_marks` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `schools`
+--
+
+DROP TABLE IF EXISTS `schools`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `schools` (
+  `school_id` int(11) NOT NULL AUTO_INCREMENT,
+  `school_code` varchar(10) NOT NULL,
+  `school_name` varchar(150) NOT NULL,
+  `description` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`school_id`),
+  UNIQUE KEY `uk_school_code` (`school_code`),
+  UNIQUE KEY `uk_school_name` (`school_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `schools`
+--
+
+LOCK TABLES `schools` WRITE;
+/*!40000 ALTER TABLE `schools` DISABLE KEYS */;
+INSERT INTO `schools` VALUES (1,'SoE','School of Engineering','Default school for engineering departments','2026-05-15 17:09:05');
+/*!40000 ALTER TABLE `schools` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `stakeholder_survey_questions`
+--
+
+DROP TABLE IF EXISTS `stakeholder_survey_questions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `stakeholder_survey_questions` (
+  `question_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `survey_id` bigint(20) NOT NULL,
+  `question_number` smallint(6) NOT NULL,
+  `question_text` text NOT NULL,
+  `po_name` varchar(5) NOT NULL,
+  `mapping_weight` decimal(3,2) NOT NULL DEFAULT 1.00 CHECK (`mapping_weight` between 0.00 and 1.00),
+  PRIMARY KEY (`question_id`),
+  UNIQUE KEY `uk_stk_survey_qnum` (`survey_id`,`question_number`),
+  CONSTRAINT `stakeholder_survey_questions_ibfk_1` FOREIGN KEY (`survey_id`) REFERENCES `stakeholder_surveys` (`survey_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=49 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `stakeholder_survey_questions`
+--
+
+LOCK TABLES `stakeholder_survey_questions` WRITE;
+/*!40000 ALTER TABLE `stakeholder_survey_questions` DISABLE KEYS */;
+/*!40000 ALTER TABLE `stakeholder_survey_questions` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `stakeholder_survey_responses`
+--
+
+DROP TABLE IF EXISTS `stakeholder_survey_responses`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `stakeholder_survey_responses` (
+  `survey_id` bigint(20) NOT NULL,
+  `respondent_identifier` varchar(255) NOT NULL,
+  `respondent_name` varchar(255) DEFAULT NULL,
+  `qualification` varchar(255) DEFAULT NULL,
+  `question_id` bigint(20) NOT NULL,
+  `likert_rating` tinyint(4) NOT NULL CHECK (`likert_rating` between 1 and 5),
+  PRIMARY KEY (`survey_id`,`respondent_identifier`,`question_id`),
+  KEY `idx_survey_question` (`survey_id`,`question_id`),
+  KEY `stakeholder_survey_responses_ibfk_2` (`question_id`),
+  CONSTRAINT `stakeholder_survey_responses_ibfk_1` FOREIGN KEY (`survey_id`) REFERENCES `stakeholder_surveys` (`survey_id`) ON DELETE CASCADE,
+  CONSTRAINT `stakeholder_survey_responses_ibfk_2` FOREIGN KEY (`question_id`) REFERENCES `stakeholder_survey_questions` (`question_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
--- Marks (CO-aggregated scores per student per test)
--- 1NF fix: CO1-CO6 repeating columns replaced with tall (co_number, marks_obtained) structure.
--- Repository layer pivots back to CO1-CO6 keys for the API response.
-CREATE TABLE `marks` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `student_roll_no` VARCHAR(20) NOT NULL,
-    `test_id` BIGINT NOT NULL,
-    `co_number` TINYINT NOT NULL CHECK (`co_number` BETWEEN 1 AND 6),
-    `marks_obtained` DECIMAL(6, 2) NOT NULL DEFAULT 0 CHECK (`marks_obtained` >= 0),
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_student_test_co` (`student_roll_no`, `test_id`, `co_number`),
-    INDEX (`test_id`),
-    FOREIGN KEY (`student_roll_no`) REFERENCES `students`(`roll_no`) ON DELETE CASCADE,
-    FOREIGN KEY (`test_id`) REFERENCES `tests`(`test_id`) ON DELETE CASCADE
+--
+-- Dumping data for table `stakeholder_survey_responses`
+--
+
+LOCK TABLES `stakeholder_survey_responses` WRITE;
+/*!40000 ALTER TABLE `stakeholder_survey_responses` DISABLE KEYS */;
+/*!40000 ALTER TABLE `stakeholder_survey_responses` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `stakeholder_surveys`
+--
+
+DROP TABLE IF EXISTS `stakeholder_surveys`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `stakeholder_surveys` (
+  `survey_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `programme_id` int(11) NOT NULL,
+  `batch_id` int(11) DEFAULT NULL,
+  `batch_year` int(11) NOT NULL,
+  `stakeholder_type` enum('Alumni','Employer','Graduate Exit','Parent','Academic Peer') NOT NULL,
+  `title` varchar(255) DEFAULT 'Stakeholder Survey',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`survey_id`),
+  UNIQUE KEY `uk_prog_batch_type` (`programme_id`,`batch_year`,`stakeholder_type`),
+  KEY `idx_ss_batch` (`batch_id`),
+  CONSTRAINT `stakeholder_surveys_ibfk_1` FOREIGN KEY (`programme_id`) REFERENCES `programmes` (`programme_id`) ON DELETE CASCADE,
+  CONSTRAINT `stakeholder_surveys_ibfk_2` FOREIGN KEY (`batch_id`) REFERENCES `programme_batches` (`batch_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `stakeholder_surveys`
+--
+
+LOCK TABLES `stakeholder_surveys` WRITE;
+/*!40000 ALTER TABLE `stakeholder_surveys` DISABLE KEYS */;
+/*!40000 ALTER TABLE `stakeholder_surveys` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `students`
+--
+
+DROP TABLE IF EXISTS `students`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `students` (
+  `roll_no` varchar(20) NOT NULL,
+  `student_name` varchar(100) NOT NULL,
+  `programme_id` int(11) NOT NULL,
+  `batch_year` int(11) DEFAULT NULL,
+  `student_status` enum('Active','Graduated','Dropped') DEFAULT 'Active',
+  `email` varchar(100) DEFAULT NULL,
+  `phone` varchar(15) DEFAULT NULL,
+  PRIMARY KEY (`roll_no`),
+  KEY `idx_students_programme` (`programme_id`),
+  CONSTRAINT `students_ibfk_1` FOREIGN KEY (`programme_id`) REFERENCES `programmes` (`programme_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
--- =============================================
--- VIEWS
--- =============================================
+--
+-- Dumping data for table `students`
+--
 
-CREATE OR REPLACE VIEW `v_current_hods` AS
-SELECT 
-    h.department_id,
-    d.department_name,
-    d.department_code,
-    u.employee_id,
-    u.username AS hod_name,
-    u.email,
-    u.designation,
-    h.start_date
-FROM `hod_assignments` h
-JOIN `users` u ON h.employee_id = u.employee_id
-JOIN `departments` d ON h.department_id = d.department_id
-WHERE h.end_date IS NULL;
+LOCK TABLES `students` WRITE;
+/*!40000 ALTER TABLE `students` DISABLE KEYS */;
+/*!40000 ALTER TABLE `students` ENABLE KEYS */;
+UNLOCK TABLES;
 
-CREATE OR REPLACE VIEW `v_current_deans` AS
-SELECT 
-    da.school_id,
-    s.school_name,
-    u.employee_id,
-    u.username AS dean_name,
-    u.email,
-    u.designation,
-    da.start_date
-FROM `dean_assignments` da
-JOIN `users` u ON da.employee_id = u.employee_id
-JOIN `schools` s ON da.school_id = s.school_id
-WHERE da.end_date IS NULL;
+--
+-- Table structure for table `system_settings`
+--
 
-CREATE OR REPLACE VIEW `v_current_offerings` AS
-SELECT 
-    co.offering_id,
-    co.course_id,
-    c.course_code,
-    c.course_name,
-    c.credit,
-    c.course_type,
-    c.course_level,
-    c.department_id,
-    d.department_name,
-    d.department_code,
-    co.year,
-    co.semester,
-    co.co_threshold,
-    co.passing_threshold,
-    cfa.employee_id AS primary_faculty_id,
-    u.username AS primary_faculty_name
-FROM `course_offerings` co
-INNER JOIN `courses` c ON co.course_id = c.course_id
-LEFT JOIN `departments` d ON c.department_id = d.department_id
-LEFT JOIN `course_faculty_assignments` cfa ON co.offering_id = cfa.offering_id 
-    AND cfa.assignment_type = 'Primary' AND cfa.is_active = 1
-LEFT JOIN `users` u ON cfa.employee_id = u.employee_id;
+DROP TABLE IF EXISTS `system_settings`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `system_settings` (
+  `setting_key` varchar(100) NOT NULL,
+  `setting_value` text NOT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`setting_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
--- =============================================
--- SEED DATA
--- =============================================
+--
+-- Dumping data for table `system_settings`
+--
 
--- Schools
-INSERT INTO `schools` (`school_code`, `school_name`, `description`)
-VALUES ('SoE', 'School of Engineering', 'Default school for engineering departments');
+LOCK TABLES `system_settings` WRITE;
+/*!40000 ALTER TABLE `system_settings` DISABLE KEYS */;
+INSERT INTO `system_settings` VALUES ('logo_url','/tulogo.png','2026-05-23 19:08:37'),('motto_subtext','Specialized knowledge promotes creativity','2026-05-23 19:08:37'),('motto_text','विज्ञानं यज्ञं तनुते','2026-05-23 19:08:37'),('system_name','Outcome Based Education System','2026-05-23 19:08:37'),('system_short_name','OBEMS','2026-05-23 19:08:37'),('university_name','Tezpur University','2026-05-23 19:08:37'),('university_subtitle','A Central University • Est. 1994','2026-05-23 19:08:37');
+/*!40000 ALTER TABLE `system_settings` ENABLE KEYS */;
+UNLOCK TABLES;
 
--- Departments
-INSERT INTO `departments` (`school_id`, `department_name`, `department_code`, `description`)
-VALUES 
-    (1, 'Computer Science & Engineering', 'CSE', 'Department of Computer Science & Engineering'),
-    (1, 'Electronics & Communication Engineering', 'ECE', 'Department of Electronics & Communication Engineering');
+--
+-- Table structure for table `tests`
+--
 
--- Users (password: password123, bcrypt hash)
-INSERT INTO `users` (`employee_id`, `username`, `email`, `password_hash`, `role`, `department_id`, `designation`)
-VALUES 
-    (1001, 'Admin One', 'admin_01@tezu.ac.in', '$2y$10$nlejuSHfBoAun490JDUHCuB4ZudU/4YR7eSh0OGuCV50poRy1NGUe', 'admin', NULL, 'System Administrator'),
-    (2001, 'HOD CSE', 'hod_cse@tezu.ac.in', '$2y$10$nlejuSHfBoAun490JDUHCuB4ZudU/4YR7eSh0OGuCV50poRy1NGUe', 'hod', 1, 'Professor'),
-    (2002, 'HOD ECE', 'hod_ece@tezu.ac.in', '$2y$10$nlejuSHfBoAun490JDUHCuB4ZudU/4YR7eSh0OGuCV50poRy1NGUe', 'hod', 2, 'Professor'),
-    (3001, 'Faculty One', 'faculty_01@tezu.ac.in', '$2y$10$nlejuSHfBoAun490JDUHCuB4ZudU/4YR7eSh0OGuCV50poRy1NGUe', 'faculty', 1, 'Associate Professor'),
-    (3002, 'Faculty Two', 'faculty_02@tezu.ac.in', '$2y$10$nlejuSHfBoAun490JDUHCuB4ZudU/4YR7eSh0OGuCV50poRy1NGUe', 'faculty', 1, 'Associate Professor'),
-    (3003, 'Faculty Three', 'faculty_03@tezu.ac.in', '$2y$10$nlejuSHfBoAun490JDUHCuB4ZudU/4YR7eSh0OGuCV50poRy1NGUe', 'faculty', 1, 'Assistant Professor'),
-    (3004, 'Faculty Four', 'faculty_04@tezu.ac.in', '$2y$10$nlejuSHfBoAun490JDUHCuB4ZudU/4YR7eSh0OGuCV50poRy1NGUe', 'faculty', 1, 'Assistant Professor'),
-    (3005, 'Faculty Five', 'faculty_05@tezu.ac.in', '$2y$10$nlejuSHfBoAun490JDUHCuB4ZudU/4YR7eSh0OGuCV50poRy1NGUe', 'faculty', 2, 'Assistant Professor'),
-    (3006, 'Faculty Six', 'faculty_06@tezu.ac.in', '$2y$10$nlejuSHfBoAun490JDUHCuB4ZudU/4YR7eSh0OGuCV50poRy1NGUe', 'faculty', 2, 'Assistant Professor'),
-    (4001, 'Staff One', 'staff_01@tezu.ac.in', '$2y$10$nlejuSHfBoAun490JDUHCuB4ZudU/4YR7eSh0OGuCV50poRy1NGUe', 'staff', 1, 'Lab Assistant'),
-    (4002, 'Staff Two', 'staff_02@tezu.ac.in', '$2y$10$nlejuSHfBoAun490JDUHCuB4ZudU/4YR7eSh0OGuCV50poRy1NGUe', 'staff', 2, 'Lab Assistant'),
-    -- Dean of SoE (managed via assignment table; uses faculty role)
-    (6001, 'Dean SoE', 'dean_soe@tezu.ac.in', '$2y$10$nlejuSHfBoAun490JDUHCuB4ZudU/4YR7eSh0OGuCV50poRy1NGUe', 'faculty', NULL, 'Dean');
+DROP TABLE IF EXISTS `tests`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `tests` (
+  `test_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `offering_id` bigint(20) NOT NULL,
+  `test_name` varchar(100) NOT NULL,
+  `test_type` enum('Mid Sem','End Sem','Assignment','Quiz') DEFAULT NULL,
+  `test_date` date DEFAULT NULL,
+  `weightage` decimal(5,2) DEFAULT NULL,
+  `full_marks` int(11) NOT NULL CHECK (`full_marks` > 0),
+  `pass_marks` int(11) NOT NULL CHECK (`pass_marks` >= 0),
+  `question_paper_pdf` longblob DEFAULT NULL,
+  PRIMARY KEY (`test_id`),
+  KEY `offering_id` (`offering_id`),
+  CONSTRAINT `tests_ibfk_1` FOREIGN KEY (`offering_id`) REFERENCES `course_offerings` (`offering_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
--- Dean Assignment for School of Engineering
-INSERT INTO `dean_assignments` (`school_id`, `employee_id`, `start_date`, `appointment_order`)
-VALUES
-    (1, 6001, '2026-01-01', 'APT/2026/DEAN/SOE/001');
+--
+-- Dumping data for table `tests`
+--
 
--- HOD Assignments (record of which faculty serves as HOD — does NOT affect login role)
--- The dedicated HOD accounts (hod_cse, hod_ece) are permanent; these records track
--- which real faculty/staff member is the "serving HOD" for historical purposes.
--- is_current is now derived: end_date IS NULL means currently active.
-INSERT INTO `hod_assignments` (`department_id`, `employee_id`, `start_date`, `appointment_order`)
-VALUES 
-    (1, 3001, '2026-01-01', 'APT/2026/HOD/CSE/001'),
-    (2, 3005, '2026-01-01', 'APT/2026/HOD/ECE/001');
+LOCK TABLES `tests` WRITE;
+/*!40000 ALTER TABLE `tests` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tests` ENABLE KEYS */;
+UNLOCK TABLES;
 
--- Courses (TEMPLATES — no year/semester/faculty; those live in offerings now)
-INSERT INTO `courses` (`course_id`, `course_code`, `department_id`, `course_name`, `course_type`, `course_level`, `credit`)
-VALUES 
-    (1, 'CS101', 1, 'Introduction to Programming', 'Theory', 'Undergraduate', 4),
-    (2, 'CS201', 1, 'Data Structures and Algorithms', 'Theory', 'Undergraduate', 4),
-    (3, 'CS301', 1, 'Database Management Systems', 'Theory', 'Undergraduate', 3),
-    (4, 'CS302', 1, 'Computer Networks', 'Theory', 'Undergraduate', 3),
-    (5, 'CS401', 1, 'Operating Systems', 'Theory', 'Undergraduate', 4),
-    (6, 'CS191', 1, 'Programming Lab', 'Lab', 'Undergraduate', 2),
-    (7, 'EC101', 2, 'Digital Electronics', 'Theory', 'Undergraduate', 4),
-    (8, 'EC201', 2, 'Signals and Systems', 'Theory', 'Undergraduate', 4);
+--
+-- Table structure for table `user_phones`
+--
 
--- Course Offerings (session instances)
-INSERT INTO `course_offerings` (`offering_id`, `course_id`, `year`, `semester`, `co_threshold`, `passing_threshold`)
-VALUES 
-    -- 2026 Spring
-    (1, 1, 2026, 'Spring', 40.00, 60.00),   -- CS101 Introduction to Programming
-    (2, 2, 2026, 'Spring', 40.00, 60.00),   -- CS201 Data Structures
-    (3, 3, 2026, 'Spring', 40.00, 60.00),   -- CS301 DBMS
-    (4, 6, 2026, 'Spring', 40.00, 60.00),   -- CS191 Programming Lab
-    -- 2025 Autumn (past offerings)
-    (5, 4, 2025, 'Autumn', 40.00, 60.00),   -- CS302 Computer Networks
-    (6, 5, 2025, 'Autumn', 40.00, 60.00),   -- CS401 Operating Systems
-    (7, 7, 2025, 'Autumn', 40.00, 60.00),   -- EC101 Digital Electronics
-    -- 2025 Spring (past offerings)
-    (8, 1, 2025, 'Spring', 40.00, 60.00),   -- CS101 Spring 2025
-    (9, 8, 2025, 'Spring', 40.00, 60.00);   -- EC201 Signals and Systems 2025
+DROP TABLE IF EXISTS `user_phones`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `user_phones` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `employee_id` int(11) NOT NULL,
+  `phone_number` varchar(15) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_emp_phone` (`employee_id`,`phone_number`),
+  KEY `idx_user_phone` (`employee_id`),
+  CONSTRAINT `user_phones_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `users` (`employee_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
--- Course Faculty Assignments (who teaches which offering)
-INSERT INTO `course_faculty_assignments` (`offering_id`, `employee_id`, `assignment_type`, `assigned_date`, `is_active`)
-VALUES 
-    -- 2026 Spring (ACTIVE)
-    (1, 3001, 'Primary', '2026-01-01', 1),     -- Faculty One → CS101 2026 Spring
-    (2, 3001, 'Primary', '2026-01-01', 1),     -- Faculty One → CS201 2026 Spring
-    (3, 3002, 'Primary', '2026-01-01', 1),     -- Faculty Two → CS301 2026 Spring
-    (4, 3003, 'Primary', '2026-01-01', 1),     -- Faculty Three → CS191 Lab 2026 Spring
-    (4, 3004, 'Lab', '2026-01-01', 1),         -- Faculty Four → CS191 Lab assistant 2026 Spring
-    -- 2025 Autumn (PAST)
-    (5, 3004, 'Primary', '2025-07-01', 0),     -- Faculty Four → CS302 2025 Autumn
-    (6, 3002, 'Primary', '2025-07-01', 0),     -- Faculty Two → CS401 2025 Autumn
-    (7, 3005, 'Primary', '2025-07-01', 0),     -- Faculty Five → EC101 2025 Autumn
-    -- 2025 Spring (PAST)
-    (8, 3003, 'Primary', '2025-01-01', 0),     -- Faculty Three → CS101 2025 Spring
-    (9, 3006, 'Primary', '2025-01-01', 0);     -- Faculty Six → EC201 2025 Spring
+--
+-- Dumping data for table `user_phones`
+--
 
--- Students
-INSERT INTO `students` (`roll_no`, `student_name`, `department_id`, `batch_year`, `student_status`, `email`)
-VALUES 
-    -- CSE 2024 batch
-    ('2024CSE001', 'Alice Johnson', 1, 2024, 'Active', 'alice@student.tezu.ac.in'),
-    ('2024CSE002', 'Bob Smith', 1, 2024, 'Active', 'bob@student.tezu.ac.in'),
-    ('2024CSE003', 'Charlie Brown', 1, 2024, 'Active', 'charlie@student.tezu.ac.in'),
-    ('2024CSE004', 'David Lee', 1, 2024, 'Active', 'david@student.tezu.ac.in'),
-    ('2024CSE005', 'Emma Watson', 1, 2024, 'Active', 'emma@student.tezu.ac.in'),
-    ('2024CSE006', 'Frank Miller', 1, 2024, 'Active', 'frank@student.tezu.ac.in'),
-    ('2024CSE007', 'Grace Park', 1, 2024, 'Active', 'grace@student.tezu.ac.in'),
-    ('2024CSE008', 'Henry Chen', 1, 2024, 'Active', 'henry@student.tezu.ac.in'),
-    ('2024CSE009', 'Iris Patel', 1, 2024, 'Active', 'iris@student.tezu.ac.in'),
-    ('2024CSE010', 'Jack Wilson', 1, 2024, 'Active', 'jack@student.tezu.ac.in'),
-    -- ECE 2024 batch
-    ('2024ECE001', 'Diana Prince', 2, 2024, 'Active', 'diana@student.tezu.ac.in'),
-    ('2024ECE002', 'Eve Wilson', 2, 2024, 'Active', 'eve@student.tezu.ac.in'),
-    ('2024ECE003', 'Kevin Hart', 2, 2024, 'Active', 'kevin@student.tezu.ac.in'),
-    ('2024ECE004', 'Luna Davis', 2, 2024, 'Active', 'luna@student.tezu.ac.in'),
-    ('2024ECE005', 'Mike Ross', 2, 2024, 'Active', 'mike@student.tezu.ac.in'),
-    -- CSE 2025 batch
-    ('2025CSE001', 'Nora Singh', 1, 2025, 'Active', 'nora@student.tezu.ac.in'),
-    ('2025CSE002', 'Oscar Gupta', 1, 2025, 'Active', 'oscar@student.tezu.ac.in'),
-    ('2025CSE003', 'Paula Sharma', 1, 2025, 'Active', 'paula@student.tezu.ac.in'),
-    -- CSE 2026 batch
-    ('2026CSE001', 'Ravi Kumar', 1, 2026, 'Active', 'ravi@student.tezu.ac.in'),
-    ('2026CSE002', 'Sita Devi', 1, 2026, 'Active', 'sita@student.tezu.ac.in'),
-    ('2026CSE003', 'Amit Singh', 1, 2026, 'Active', 'amit@student.tezu.ac.in');
+LOCK TABLES `user_phones` WRITE;
+/*!40000 ALTER TABLE `user_phones` DISABLE KEYS */;
+INSERT INTO `user_phones` VALUES (1,9000001,'9876543210','2026-05-15 17:09:05'),(2,9000001,'9876543211','2026-05-15 17:09:05'),(7,8000001,'9876543216','2026-05-15 17:09:05');
+/*!40000 ALTER TABLE `user_phones` ENABLE KEYS */;
+UNLOCK TABLES;
 
--- Enrollments (students enrolled in specific offerings)
-INSERT INTO `enrollments` (`offering_id`, `enrollment_status`, `student_rollno`)
-VALUES 
-    -- 2024 CSE students in CS101 (offering 1)
-    (1, 'Enrolled', '2024CSE001'),
-    (1, 'Enrolled', '2024CSE002'),
-    (1, 'Enrolled', '2024CSE003'),
-    (1, 'Enrolled', '2024CSE004'),
-    (1, 'Enrolled', '2024CSE005'),
-    (1, 'Enrolled', '2024CSE006'),
-    (1, 'Enrolled', '2024CSE007'),
-    (1, 'Enrolled', '2024CSE008'),
-    (1, 'Enrolled', '2024CSE009'),
-    (1, 'Enrolled', '2024CSE010'),
-    -- 2024 CSE students in CS201 (offering 2)
-    (2, 'Enrolled', '2024CSE001'),
-    (2, 'Enrolled', '2024CSE002'),
-    (2, 'Enrolled', '2024CSE003'),
-    (2, 'Enrolled', '2024CSE004'),
-    (2, 'Enrolled', '2024CSE005'),
-    (2, 'Enrolled', '2024CSE006'),
-    (2, 'Enrolled', '2024CSE007'),
-    (2, 'Enrolled', '2024CSE008'),
-    (2, 'Enrolled', '2024CSE009'),
-    (2, 'Enrolled', '2024CSE010'),
-    -- 2024 CSE students in CS301 DBMS (offering 3)
-    (3, 'Enrolled', '2024CSE001'),
-    (3, 'Enrolled', '2024CSE002'),
-    (3, 'Enrolled', '2024CSE003'),
-    (3, 'Enrolled', '2024CSE004'),
-    (3, 'Enrolled', '2024CSE005'),
-    -- 2024 CSE students in Programming Lab (offering 4)
-    (4, 'Enrolled', '2024CSE001'),
-    (4, 'Enrolled', '2024CSE002'),
-    (4, 'Enrolled', '2024CSE003'),
-    -- 2024 CSE in CS302 Networks sem 2 (offering 5)
-    (5, 'Enrolled', '2024CSE001'),
-    (5, 'Enrolled', '2024CSE002'),
-    (5, 'Enrolled', '2024CSE003'),
-    (5, 'Enrolled', '2024CSE004'),
-    (5, 'Enrolled', '2024CSE005'),
-    -- ECE students in EC101 (offering 7)
-    (7, 'Enrolled', '2024ECE001'),
-    (7, 'Enrolled', '2024ECE002'),
-    (7, 'Enrolled', '2024ECE003'),
-    (7, 'Enrolled', '2024ECE004'),
-    (7, 'Enrolled', '2024ECE005'),
-    -- 2025 CSE batch in CS101 2025 Spring (offering 8)
-    (8, 'Enrolled', '2025CSE001'),
-    (8, 'Enrolled', '2025CSE002'),
-    (8, 'Enrolled', '2025CSE003'),
-    -- 2026 CSE batch in CS101 2026 Spring (offering 1)
-    (1, 'Enrolled', '2026CSE001'),
-    (1, 'Enrolled', '2026CSE002'),
-    (1, 'Enrolled', '2026CSE003');
+--
+-- Table structure for table `users`
+--
 
--- Tests (belong to specific offerings)
-INSERT INTO `tests` (`test_id`, `offering_id`, `test_name`, `test_type`, `test_date`, `weightage`, `full_marks`, `pass_marks`)
-VALUES 
-    -- CS101 2026 Spring (offering 1)
-    (1, 1, 'Mid Semester Exam', 'Mid Sem', '2026-03-15', 30.00, 50, 20),
-    (2, 1, 'End Semester Exam', 'End Sem', '2026-05-20', 70.00, 100, 40),
-    (3, 1, 'Assignment 1', 'Assignment', '2026-02-15', NULL, 20, 8),
-    -- CS201 2026 Spring (offering 2)
-    (4, 2, 'Mid Semester Exam', 'Mid Sem', '2026-03-16', 30.00, 50, 20),
-    (5, 2, 'Quiz 1', 'Quiz', '2026-02-20', NULL, 10, 4),
-    -- CS301 DBMS 2026 Spring (offering 3)
-    (6, 3, 'Mid Semester Exam', 'Mid Sem', '2026-03-17', 30.00, 50, 20),
-    -- CS302 Networks 2026 Autumn (offering 5)
-    (7, 5, 'Mid Semester Exam', 'Mid Sem', '2026-09-15', 30.00, 50, 20),
-    -- EC101 2026 Autumn (offering 7)
-    (8, 7, 'Mid Semester Exam', 'Mid Sem', '2026-09-16', 30.00, 50, 20);
+DROP TABLE IF EXISTS `users`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `users` (
+  `employee_id` int(11) NOT NULL,
+  `username` varchar(64) NOT NULL,
+  `email` varchar(64) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `role` enum('admin','faculty','hod','dean','staff') NOT NULL,
+  `department_id` int(11) DEFAULT NULL,
+  `school_id` int(11) DEFAULT NULL,
+  `designation` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`employee_id`),
+  UNIQUE KEY `email` (`email`),
+  KEY `department_id` (`department_id`),
+  KEY `school_id` (`school_id`),
+  CONSTRAINT `users_ibfk_1` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE SET NULL,
+  CONSTRAINT `users_ibfk_2` FOREIGN KEY (`school_id`) REFERENCES `schools` (`school_id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
--- Questions (exactly as original — sub_question, is_optional, co)
-INSERT INTO `questions` (`test_id`, `question_number`, `sub_question`, `is_optional`, `co`, `max_marks`)
-VALUES 
-    -- CS101 Mid Sem (test 1)
-    (1, 1, NULL, 0, 1, 10.00),
-    (1, 2, 'a', 0, 2, 5.00),
-    (1, 2, 'b', 0, 2, 5.00),
-    (1, 3, NULL, 1, 3, 10.00),
-    (1, 4, NULL, 1, 3, 10.00),
-    (1, 5, NULL, 0, 4, 10.00),
-    -- CS101 End Sem (test 2)
-    (2, 1, 'a', 0, 1, 10.00),
-    (2, 1, 'b', 0, 1, 10.00),
-    (2, 2, NULL, 0, 2, 15.00),
-    (2, 3, NULL, 0, 3, 15.00),
-    (2, 4, 'a', 0, 4, 10.00),
-    (2, 4, 'b', 0, 5, 10.00),
-    (2, 5, NULL, 1, 5, 15.00),
-    (2, 6, NULL, 1, 6, 15.00),
-    -- CS101 Assignment 1 (test 3)
-    (3, 1, NULL, 0, 1, 10.00),
-    (3, 2, NULL, 0, 2, 10.00),
-    -- CS201 Mid Sem (test 4)
-    (4, 1, NULL, 0, 1, 10.00),
-    (4, 2, 'a', 0, 2, 5.00),
-    (4, 2, 'b', 0, 2, 5.00),
-    (4, 3, NULL, 0, 3, 10.00),
-    (4, 4, NULL, 1, 4, 10.00),
-    (4, 5, NULL, 1, 4, 10.00),
-    -- CS201 Quiz 1 (test 5)
-    (5, 1, NULL, 0, 1, 5.00),
-    (5, 2, NULL, 0, 2, 5.00),
-    -- CS301 DBMS Mid Sem (test 6)
-    (6, 1, NULL, 0, 1, 10.00),
-    (6, 2, 'a', 0, 2, 5.00),
-    (6, 2, 'b', 0, 2, 5.00),
-    (6, 3, NULL, 0, 3, 15.00),
-    (6, 4, NULL, 0, 4, 15.00);
+--
+-- Dumping data for table `users`
+--
 
--- Raw Marks (per-question scores for some students)
--- test_id removed from table; test context is derived via question_id → questions.test_id.
-INSERT INTO `raw_marks` (`student_id`, `question_id`, `marks_obtained`)
-VALUES 
-    -- CS101 Mid Sem (test 1) — questions 1-6
-    -- Student 2024CSE001
-    ('2024CSE001', 1, 8.50),
-    ('2024CSE001', 2, 4.00),
-    ('2024CSE001', 3, 4.50),
-    ('2024CSE001', 4, 9.00),
-    ('2024CSE001', 6, 8.00),
-    -- Student 2024CSE002
-    ('2024CSE002', 1, 7.00),
-    ('2024CSE002', 2, 3.50),
-    ('2024CSE002', 3, 4.00),
-    ('2024CSE002', 5, 8.50),
-    ('2024CSE002', 6, 7.50),
-    -- Student 2024CSE003
-    ('2024CSE003', 1, 9.00),
-    ('2024CSE003', 2, 5.00),
-    ('2024CSE003', 3, 5.00),
-    ('2024CSE003', 4, 10.00),
-    ('2024CSE003', 6, 9.50),
-    -- Student 2024CSE004
-    ('2024CSE004', 1, 6.00),
-    ('2024CSE004', 2, 3.00),
-    ('2024CSE004', 3, 2.50),
-    ('2024CSE004', 4, 7.00),
-    ('2024CSE004', 6, 5.50),
-    -- Student 2024CSE005
-    ('2024CSE005', 1, 10.00),
-    ('2024CSE005', 2, 5.00),
-    ('2024CSE005', 3, 4.50),
-    ('2024CSE005', 5, 9.50),
-    ('2024CSE005', 6, 10.00);
+LOCK TABLES `users` WRITE;
+/*!40000 ALTER TABLE `users` DISABLE KEYS */;
+INSERT INTO `users` VALUES (8000001,'Dean SoE','dean_soe@tezu.ac.in','$2y$10$Hcol8QcUPcwvAEDxXbEe/.aYPKmhwGloLSPoD6JKbZ4f8FYC82b7q','dean',NULL,1,'Dean','2026-05-15 17:09:05','2026-05-21 14:16:03'),(9000001,'Admin One','admin_01@tezu.ac.in','$2y$10$Hcol8QcUPcwvAEDxXbEe/.aYPKmhwGloLSPoD6JKbZ4f8FYC82b7q','admin',NULL,NULL,'System Administrator','2026-05-15 17:09:05','2026-05-21 14:15:56');
+/*!40000 ALTER TABLE `users` ENABLE KEYS */;
+UNLOCK TABLES;
 
--- CO-PO Mappings (for course templates)
--- co_name strings replaced with co_number integers to match questions.co type.
-INSERT INTO `co_po_mapping` (`course_id`, `co_number`, `po_name`, `value`)
-VALUES 
-    -- CS101: Introduction to Programming
-    (1, 1, 'PO1', 3), (1, 1, 'PO2', 2), (1, 1, 'PO5', 1),
-    (1, 2, 'PO1', 2), (1, 2, 'PO2', 3), (1, 2, 'PO3', 1),
-    (1, 3, 'PO2', 2), (1, 3, 'PO3', 3), (1, 3, 'PO5', 2),
-    (1, 4, 'PO1', 1), (1, 4, 'PO3', 2), (1, 4, 'PO5', 3),
-    -- CS201: Data Structures
-    (2, 1, 'PO1', 3), (2, 1, 'PO2', 2),
-    (2, 2, 'PO1', 2), (2, 2, 'PO2', 3), (2, 2, 'PO3', 2),
-    (2, 3, 'PO2', 2), (2, 3, 'PO3', 3),
-    (2, 4, 'PO3', 2), (2, 4, 'PO5', 2),
-    -- CS301: DBMS
-    (3, 1, 'PO1', 3), (3, 1, 'PO2', 1),
-    (3, 2, 'PO1', 2), (3, 2, 'PO2', 3), (3, 2, 'PO3', 1),
-    (3, 3, 'PO2', 2), (3, 3, 'PO3', 3), (3, 3, 'PO5', 1),
-    (3, 4, 'PO3', 2), (3, 4, 'PO5', 3);
+--
+-- Temporary table structure for view `v_current_deans`
+--
 
--- Attainment Scale (per course template)
-INSERT INTO `attainment_scale` (`course_id`, `level`, `min_percentage`)
-VALUES 
-    -- CS101
-    (1, 1, 40.00), (1, 2, 60.00), (1, 3, 80.00),
-    -- CS201
-    (2, 1, 40.00), (2, 2, 60.00), (2, 3, 80.00),
-    -- CS301
-    (3, 1, 40.00), (3, 2, 60.00), (3, 3, 80.00);
+DROP TABLE IF EXISTS `v_current_deans`;
+/*!50001 DROP VIEW IF EXISTS `v_current_deans`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+/*!50001 CREATE VIEW `v_current_deans` AS SELECT
+ 1 AS `school_id`,
+  1 AS `school_name`,
+  1 AS `employee_id`,
+  1 AS `dean_name`,
+  1 AS `email`,
+  1 AS `designation`,
+  1 AS `start_date` */;
+SET character_set_client = @saved_cs_client;
 
--- =============================================
--- VERIFICATION
--- =============================================
+--
+-- Temporary table structure for view `v_current_hods`
+--
 
-SELECT 'schools' AS `table`, COUNT(*) AS `rows` FROM `schools`
-UNION ALL SELECT 'departments', COUNT(*) FROM `departments`
-UNION ALL SELECT 'users', COUNT(*) FROM `users`
-UNION ALL SELECT 'hod_assignments', COUNT(*) FROM `hod_assignments`UNION ALL SELECT 'dean_assignments', COUNT(*) FROM `dean_assignments`UNION ALL SELECT 'students', COUNT(*) FROM `students`
-UNION ALL SELECT 'courses', COUNT(*) FROM `courses`
-UNION ALL SELECT 'course_offerings', COUNT(*) FROM `course_offerings`
-UNION ALL SELECT 'faculty_assignments', COUNT(*) FROM `course_faculty_assignments`
-UNION ALL SELECT 'enrollments', COUNT(*) FROM `enrollments`
-UNION ALL SELECT 'tests', COUNT(*) FROM `tests`
-UNION ALL SELECT 'questions', COUNT(*) FROM `questions`
-UNION ALL SELECT 'raw_marks', COUNT(*) FROM `raw_marks`
-UNION ALL SELECT 'co_po_mapping', COUNT(*) FROM `co_po_mapping`
-UNION ALL SELECT 'attainment_scale', COUNT(*) FROM `attainment_scale`;
+DROP TABLE IF EXISTS `v_current_hods`;
+/*!50001 DROP VIEW IF EXISTS `v_current_hods`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+/*!50001 CREATE VIEW `v_current_hods` AS SELECT
+ 1 AS `department_id`,
+  1 AS `department_name`,
+  1 AS `department_code`,
+  1 AS `employee_id`,
+  1 AS `hod_name`,
+  1 AS `email`,
+  1 AS `designation`,
+  1 AS `start_date` */;
+SET character_set_client = @saved_cs_client;
 
--- =============================================
--- END OF SCHEMA
--- =============================================
+--
+-- Temporary table structure for view `v_current_offerings`
+--
+
+DROP TABLE IF EXISTS `v_current_offerings`;
+/*!50001 DROP VIEW IF EXISTS `v_current_offerings`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+/*!50001 CREATE VIEW `v_current_offerings` AS SELECT
+ 1 AS `offering_id`,
+  1 AS `course_id`,
+  1 AS `course_code`,
+  1 AS `course_name`,
+  1 AS `credit`,
+  1 AS `course_type`,
+  1 AS `course_level`,
+  1 AS `department_id`,
+  1 AS `department_name`,
+  1 AS `department_code`,
+  1 AS `year`,
+  1 AS `semester`,
+  1 AS `co_threshold`,
+  1 AS `passing_threshold`,
+  1 AS `primary_faculty_id`,
+  1 AS `primary_faculty_name` */;
+SET character_set_client = @saved_cs_client;
+
+--
+-- Table structure for table `password_resets`
+--
+
+DROP TABLE IF EXISTS `password_resets`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `password_resets` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `email` varchar(255) NOT NULL,
+  `token` varchar(255) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `expires_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `email` (`email`),
+  KEY `token` (`token`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `password_resets`
+--
+
+LOCK TABLES `password_resets` WRITE;
+/*!40000 ALTER TABLE `password_resets` DISABLE KEYS */;
+/*!40000 ALTER TABLE `password_resets` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping events for database 'nba_db'
+--
+
+--
+-- Dumping routines for database 'nba_db'
+--
+
+--
+-- Final view structure for view `v_current_deans`
+--
+
+/*!50001 DROP VIEW IF EXISTS `v_current_deans`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_unicode_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50001 VIEW `v_current_deans` AS select `da`.`school_id` AS `school_id`,`s`.`school_name` AS `school_name`,`u`.`employee_id` AS `employee_id`,`u`.`username` AS `dean_name`,`u`.`email` AS `email`,`u`.`designation` AS `designation`,`da`.`start_date` AS `start_date` from ((`dean_assignments` `da` join `users` `u` on(`da`.`employee_id` = `u`.`employee_id`)) join `schools` `s` on(`da`.`school_id` = `s`.`school_id`)) where `da`.`end_date` is null */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `v_current_hods`
+--
+
+/*!50001 DROP VIEW IF EXISTS `v_current_hods`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_unicode_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50001 VIEW `v_current_hods` AS select `h`.`department_id` AS `department_id`,`d`.`department_name` AS `department_name`,`d`.`department_code` AS `department_code`,`u`.`employee_id` AS `employee_id`,`u`.`username` AS `hod_name`,`u`.`email` AS `email`,`u`.`designation` AS `designation`,`h`.`start_date` AS `start_date` from ((`hod_assignments` `h` join `users` `u` on(`h`.`employee_id` = `u`.`employee_id`)) join `departments` `d` on(`h`.`department_id` = `d`.`department_id`)) where `h`.`end_date` is null */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `v_current_offerings`
+--
+
+/*!50001 DROP VIEW IF EXISTS `v_current_offerings`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_unicode_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50001 VIEW `v_current_offerings` AS select `co`.`offering_id` AS `offering_id`,`co`.`course_id` AS `course_id`,`c`.`course_code` AS `course_code`,`c`.`course_name` AS `course_name`,`c`.`credit` AS `credit`,`c`.`course_type` AS `course_type`,`c`.`course_level` AS `course_level`,`c`.`department_id` AS `department_id`,`d`.`department_name` AS `department_name`,`d`.`department_code` AS `department_code`,`co`.`year` AS `year`,`co`.`semester` AS `semester`,`co`.`co_threshold` AS `co_threshold`,`co`.`passing_threshold` AS `passing_threshold`,`cfa`.`employee_id` AS `primary_faculty_id`,`u`.`username` AS `primary_faculty_name` from ((((`course_offerings` `co` join `courses` `c` on(`co`.`course_id` = `c`.`course_id`)) left join `departments` `d` on(`c`.`department_id` = `d`.`department_id`)) left join `course_faculty_assignments` `cfa` on(`co`.`offering_id` = `cfa`.`offering_id` and `cfa`.`assignment_type` = 'Primary' and `cfa`.`is_active` = 1)) left join `users` `u` on(`cfa`.`employee_id` = `u`.`employee_id`)) */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2026-05-23 19:08:37

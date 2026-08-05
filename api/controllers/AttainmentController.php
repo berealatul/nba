@@ -4,62 +4,379 @@ require_once __DIR__ . '/../models/Course.php';
 require_once __DIR__ . '/../models/CourseRepository.php';
 require_once __DIR__ . '/../models/AttainmentScale.php';
 require_once __DIR__ . '/../models/AttainmentScaleRepository.php';
+require_once __DIR__ . '/../models/AttainmentSnapshotRepository.php';
 require_once __DIR__ . '/../models/CoPoRepository.php';
+require_once __DIR__ . '/../models/ProgrammeRepository.php';
+require_once __DIR__ . '/../utils/AttainmentSnapshotService.php';
 
 class AttainmentController
 {
+    protected $auditService;
+
     private ?CourseRepository $courseRepo;
     private ?CourseOfferingRepository $offeringRepo;
     private ?AttainmentScaleRepository $scaleRepo;
     private ?CoPoRepository $coPoRepo;
+    private ?ProgrammeRepository $programmeRepo;
+    private ?AttainmentSnapshotRepository $snapshotRepo;
+    private ?AttainmentSnapshotService $snapshotService;
+    private ?AttainmentJobRepository $jobRepo;
 
     public function __construct(
-        ?CourseRepository $courseRepo = null, 
+        ?CourseRepository $courseRepo = null,
         ?CourseOfferingRepository $offeringRepo = null,
-        ?AttainmentScaleRepository $scaleRepo = null, 
-        ?CoPoRepository $coPoRepo = null
+        ?AttainmentScaleRepository $scaleRepo = null,
+        ?CoPoRepository $coPoRepo = null,
+        ?ProgrammeRepository $programmeRepo = null,
+        ?AttainmentSnapshotRepository $snapshotRepo = null,
+        ?AttainmentSnapshotService $snapshotService = null,
+        ?AuditService $auditService = null,
+        ?AttainmentJobRepository $jobRepo = null
     ) {
+        $this->auditService = $auditService;
+
         $this->courseRepo = $courseRepo;
         $this->offeringRepo = $offeringRepo;
         $this->scaleRepo = $scaleRepo;
         $this->coPoRepo = $coPoRepo;
+        $this->programmeRepo = $programmeRepo;
+        $this->snapshotRepo = $snapshotRepo;
+        $this->snapshotService = $snapshotService;
+        $this->jobRepo = $jobRepo;
     }
 
     /**
-     * Resolve an incoming id to a course_id.
-     * Accepts either a template course_id or an offering_id.
-     * Returns ['course_id' => int, 'offering_id' => int|null, 'course' => Course]
-     * or null when not found.
+     * Get CO/PO attainment for an offering.
+     * Returns persisted snapshots when available, otherwise live preview.
      */
-    private function resolveCourseId(int $id): ?array
+    public function getOfferingAttainment(int $offeringId): void
     {
-        // Try as a direct course_id first
-        $course = $this->courseRepo->findById($id);
-        if ($course) {
-            return ['course_id' => $id, 'offering_id' => null, 'course' => $course];
+        try {
+            $resolved = $this->resolveOffering($offeringId);
+            if (!$resolved) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Course offering not found']);
+                return;
+            }
+
+            if (!$this->snapshotRepo || !$this->snapshotService) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Service not initialized']);
+                return;
+            }
+
+            $programmeId = isset($_GET['programme_id']) && $_GET['programme_id'] !== '' ? (int)$_GET['programme_id'] : null;
+            $isRepeater = isset($_GET['is_repeater']) && $_GET['is_repeater'] !== '' ? filter_var($_GET['is_repeater'], FILTER_VALIDATE_BOOLEAN) : null;
+
+            // Check if course offering has any active assignments (active/editable mode)
+            $db = $this->snapshotRepo->getDb();
+            $stmt = $db->prepare("SELECT COUNT(*) FROM course_faculty_assignments WHERE offering_id = ? AND is_active = 1");
+            $stmt->execute([$offeringId]);
+            $hasActiveAssignment = (int)$stmt->fetchColumn() > 0;
+
+            if ($hasActiveAssignment) {
+                // Clear any existing stale snapshots and force live calculations
+                $this->snapshotRepo->clearByOfferingId($offeringId);
+                $snapshotExists = false;
+            } else {
+                $snapshotExists = $this->snapshotRepo->hasSnapshots($offeringId);
+            }
+
+            if ($snapshotExists) {
+                $payload = [
+                    'offering_id' => $offeringId,
+                    'programme_id' => $programmeId,
+                    'is_repeater' => $isRepeater,
+                    'co_threshold' => (float)$resolved['offering']->getCoThreshold(),
+                    'passing_threshold' => (float)$resolved['offering']->getPassingThreshold(),
+                    'attainment_thresholds' => array_map(function ($scale) {
+                        return [
+                            'id' => $scale->id,
+                            'level' => $scale->level,
+                            'percentage' => (float)$scale->min_percentage,
+                        ];
+                    }, $this->scaleRepo->getByOfferingId($offeringId)),
+                    'co_attainment' => $this->snapshotRepo->getCoAttainmentsByOfferingId($offeringId, $programmeId, $isRepeater),
+                    'po_attainment' => $this->snapshotRepo->getPoAttainmentsByOfferingId($offeringId, $programmeId, $isRepeater),
+                ];
+            } else {
+                $payload = $this->snapshotService->calculatePreview($offeringId, $programmeId, $isRepeater);
+            }
+
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'snapshot_exists' => $snapshotExists,
+                'data' => $payload,
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
-        // Try as an offering_id
-        if ($this->offeringRepo) {
-            $offering = $this->offeringRepo->findById($id);
-            if ($offering) {
-                $course = $this->courseRepo->findById($offering->getCourseId());
-                if ($course) {
-                    return [
-                        'course_id'   => $offering->getCourseId(),
-                        'offering_id' => $id,
-                        'course'      => $course,
+    }
+
+    /**
+     * Get course-level PO/PSO attainment for the programme articulation matrix.
+     * GET /programmes/{id}/attainment/courses?batch_year=
+     */
+    public function getCoursesProgrammeAttainment(int $programmeId): void
+    {
+        try {
+            if (!$this->programmeRepo || !$this->snapshotRepo) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Service not initialized']);
+                return;
+            }
+
+            $programme = $this->programmeRepo->findById($programmeId);
+            if (!$programme) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Programme not found']);
+                return;
+            }
+
+            $batchYear = isset($_GET['batch_year']) && $_GET['batch_year'] !== ''
+                ? (int)$_GET['batch_year']
+                : null;
+
+            if (!$batchYear) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'batch_year query parameter is required']);
+                return;
+            }
+
+            $rows = $this->snapshotRepo->getCourseLevelPoAttainment($programmeId, $batchYear);
+
+            // Build all PO/PSO names (PO1-PO12, PSO1-PSO3)
+            $poList = [];
+            for ($i = 1; $i <= 12; $i++) { $poList[] = 'PO' . $i; }
+            for ($i = 1; $i <= 3; $i++) { $poList[] = 'PSO' . $i; }
+
+            // Pivot rows into per-course structure
+            $courses = [];
+            $sumDirect = array_fill_keys($poList, 0.0);
+            $sumFinal = array_fill_keys($poList, 0.0);
+            $countDirect = array_fill_keys($poList, 0);
+            $countFinal = array_fill_keys($poList, 0);
+            $seenCourses = [];
+
+            foreach ($rows as $row) {
+                $offeringId = (int)$row['offering_id'];
+                $poName = $row['po_name'];
+
+                // Skip unknown PO names (safety)
+                if (!in_array($poName, $poList, true)) {
+                    continue;
+                }
+
+                $directVal = $row['attainment_value'] !== null ? (float)$row['attainment_value'] : null;
+                $finalVal = $row['final_attainment_value'] !== null ? (float)$row['final_attainment_value'] : null;
+
+                if (!isset($seenCourses[$offeringId])) {
+                    $courses[] = [
+                        'offering_id' => $offeringId,
+                        'course_code' => $row['course_code'],
+                        'course_name' => $row['course_name'],
+                        'values' => array_fill_keys($poList, null),
                     ];
+                    $seenCourses[$offeringId] = count($courses) - 1;
+                }
+
+                $idx = $seenCourses[$offeringId];
+                $courses[$idx]['values'][$poName] = $finalVal;
+
+                // Accumulate for averages
+                if ($directVal !== null) {
+                    $sumDirect[$poName] += $directVal;
+                    $countDirect[$poName]++;
+                }
+                if ($finalVal !== null) {
+                    $sumFinal[$poName] += $finalVal;
+                    $countFinal[$poName]++;
                 }
             }
+
+            // Read blended programme-level data from programme_batch_attainments
+            $blendedStmt = $this->snapshotRepo->getDb()->prepare(
+                "SELECT po_name, direct_attainment, indirect_attainment, final_attainment, target
+                 FROM programme_batch_attainments
+                 WHERE programme_id = ? AND batch_year = ?"
+            );
+            $blendedStmt->execute([$programmeId, $batchYear]);
+            $blendedRows = $blendedStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $hasBlended = !empty($blendedRows);
+            $blendedByPo = [];
+            foreach ($blendedRows as $b) {
+                $blendedByPo[$b['po_name']] = $b;
+            }
+
+            // Compute averages — prefer blended when available
+            $averages = [];
+            $finals = [];
+            $indirect = [];
+            $targets = [];
+            foreach ($poList as $po) {
+                if ($hasBlended && isset($blendedByPo[$po])) {
+                    $averages[$po] = (float)$blendedByPo[$po]['direct_attainment'];
+                    $finals[$po] = (float)$blendedByPo[$po]['final_attainment'];
+                    $indirect[$po] = (float)$blendedByPo[$po]['indirect_attainment'];
+                    $targets[$po] = (float)$blendedByPo[$po]['target'];
+                } else {
+                    $averages[$po] = $countDirect[$po] > 0
+                        ? round($sumDirect[$po] / $countDirect[$po], 2)
+                        : 0.0;
+                    $finals[$po] = $countFinal[$po] > 0
+                        ? round($sumFinal[$po] / $countFinal[$po], 2)
+                        : 0.0;
+                    $indirect[$po] = null;
+                    $targets[$po] = 0.0;
+                }
+            }
+
+            // Override targets from separate query as fallback
+            $savedTargets = $this->snapshotRepo->getTargets($programmeId, $batchYear);
+            foreach ($savedTargets as $po => $val) {
+                $targets[$po] = $val;
+            }
+
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'data' => [
+                    'programme_id' => $programmeId,
+                    'batch_year' => $batchYear,
+                    'po_list' => $poList,
+                    'courses' => $courses,
+                    'averages' => $averages,
+                    'finals' => $finals,
+                    'indirect' => $indirect,
+                    'targets' => $targets,
+                ],
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
-        return null;
+    }
+
+    /**
+     * Get programme-level PO attainment from persisted offering snapshots.
+     */
+    public function getProgrammeAttainment(int $programmeId): void
+    {
+        try {
+            if (!$this->programmeRepo || !$this->snapshotRepo) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Service not initialized']);
+                return;
+            }
+
+            $programme = $this->programmeRepo->findById($programmeId);
+            if (!$programme) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Programme not found']);
+                return;
+            }
+
+            $batchYear = isset($_GET['batch_year']) && $_GET['batch_year'] !== ''
+                ? (int)$_GET['batch_year']
+                : null;
+
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'data' => [
+                    'programme_id' => $programmeId,
+                    'batch_year' => $batchYear,
+                    'po_attainment' => $this->snapshotRepo->getProgrammePoAttainment($programmeId, $batchYear),
+                ],
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Calculate and persist programme-level batch attainment.
+     * POST /programmes/{id}/attainment?batch_year=
+     */
+    public function calculateProgrammeAttainment(int $programmeId): void
+    {
+        try {
+            if (!$this->snapshotService || !$this->programmeRepo) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Service not initialized']);
+                return;
+            }
+
+            $programme = $this->programmeRepo->findById($programmeId);
+            if (!$programme) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Programme not found']);
+                return;
+            }
+
+            $batchYear = isset($_GET['batch_year']) && $_GET['batch_year'] !== ''
+                ? (int)$_GET['batch_year']
+                : null;
+
+            if (!$batchYear) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'batch_year query parameter is required']);
+                return;
+            }
+
+            $result = $this->snapshotService->calculateProgrammeBatchAttainment($programmeId, $batchYear);
+
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'data' => [
+                    'programme_id' => $programmeId,
+                    'batch_year' => $batchYear,
+                    'po_attainment' => $result,
+                ],
+                'message' => 'Programme attainment calculated successfully',
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Resolve and validate an offering id.
+     * Returns ['offering' => CourseOffering, 'course' => Course] or null.
+     */
+    private function resolveOffering(int $offeringId): ?array
+    {
+        if (!$this->offeringRepo || !$this->courseRepo) {
+            return null;
+        }
+
+        $offering = $this->offeringRepo->findById($offeringId);
+        if (!$offering) {
+            return null;
+        }
+
+        $course = $this->courseRepo->findById($offering->getCourseId());
+        if (!$course) {
+            return null;
+        }
+
+        return [
+            'offering' => $offering,
+            'course' => $course,
+        ];
     }
 
     /**
      * Get CO-PO Matrix
-     * GET /courses/{courseId}/copo-matrix
+     * GET /offerings/{offeringId}/copo-matrix
      */
-    public function getCoPoMatrix(int $courseId): void
+    public function getCoPoMatrix(int $offeringId): void
     {
         try {
             if (!$this->coPoRepo) {
@@ -68,19 +385,19 @@ class AttainmentController
                 return;
             }
 
-            $resolved = $this->resolveCourseId($courseId);
+            $resolved = $this->resolveOffering($offeringId);
             if (!$resolved) {
                 http_response_code(404);
-                echo json_encode(['success' => false, 'message' => 'Course not found']);
+                echo json_encode(['success' => false, 'message' => 'Course offering not found']);
                 return;
             }
 
-            $rows = $this->coPoRepo->getMatrix($resolved['course_id']);
+            $rows = $this->coPoRepo->getMatrix($offeringId);
 
             http_response_code(200);
             echo json_encode([
                 'success' => true,
-                'data' => $rows
+                'data' => $rows,
             ]);
         } catch (Exception $e) {
             http_response_code(500);
@@ -90,9 +407,9 @@ class AttainmentController
 
     /**
      * Save CO-PO Matrix
-     * POST /courses/{courseId}/copo-matrix
+     * POST /offerings/{offeringId}/copo-matrix
      */
-    public function saveCoPoMatrix(int $courseId): void
+    public function saveCoPoMatrix(int $offeringId): void
     {
         try {
             if (!$this->coPoRepo) {
@@ -109,19 +426,27 @@ class AttainmentController
                 return;
             }
 
-            $resolved = $this->resolveCourseId($courseId);
+            $resolved = $this->resolveOffering($offeringId);
             if (!$resolved) {
                 http_response_code(404);
-                echo json_encode(['success' => false, 'message' => 'Course not found']);
+                echo json_encode(['success' => false, 'message' => 'Course offering not found']);
                 return;
             }
 
-            $this->coPoRepo->saveMatrix($resolved['course_id'], $input['mappings']);
+            $this->coPoRepo->saveMatrix($offeringId, $input['mappings']);
 
             http_response_code(200);
+
+            $auditPayload = isset($input) ? $input : null;
+            if (isset($this->auditService)) {
+                $this->auditService->log('UPDATE', 'CoPoMatrix', null, ($GLOBALS['audit_old_state'] ?? null), $auditPayload);
+            }
+            if (isset($GLOBALS['fileLogger'])) {
+                $GLOBALS['fileLogger']->log('INFO', 'AttainmentController', 'UPDATE operation successful in saveCoPoMatrix');
+            }
             echo json_encode([
                 'success' => true,
-                'message' => 'CO-PO Matrix saved successfully'
+                'message' => 'CO-PO Matrix saved successfully',
             ]);
         } catch (Exception $e) {
             http_response_code(500);
@@ -130,64 +455,58 @@ class AttainmentController
     }
 
     /**
-     * Get attainment configuration for a course
-     * GET /courses/{courseId}/attainment-config
+     * Get attainment configuration for an offering
+     * GET /offerings/{offeringId}/attainment-config
      */
-    public function getConfig(int $courseId): void
+    public function getConfig(int $offeringId): void
     {
         try {
-            $resolved = $this->resolveCourseId($courseId);
+            $resolved = $this->resolveOffering($offeringId);
             if (!$resolved) {
                 http_response_code(404);
-                echo json_encode(['success' => false, 'message' => 'Course not found']);
+                echo json_encode(['success' => false, 'message' => 'Course offering not found']);
                 return;
             }
-            $resolvedCourseId = $resolved['course_id'];
 
-            // Use the specific offering when available, otherwise fall back to latest
-            if ($resolved['offering_id'] !== null) {
-                $offering = $this->offeringRepo->findById($resolved['offering_id']);
-                $offeringData = $offering ? [
-                    'co_threshold'      => $offering->getCoThreshold(),
-                    'passing_threshold' => $offering->getPassingThreshold(),
-                    'offering_id'       => $offering->getOfferingId(),
-                ] : null;
-            } else {
-                $offerings = $this->offeringRepo->findByCourseId($resolvedCourseId);
-                $offeringData = !empty($offerings) ? $offerings[0] : null;
-            }
+            $offering = $resolved['offering'];
+            $course = $resolved['course'];
 
-            // Get attainment thresholds
-            $scales = $this->scaleRepo->getByCourseId($resolvedCourseId);
+            $scales = $this->scaleRepo->getByOfferingId($offeringId);
 
             $response = [
                 'success' => true,
                 'data' => [
-                    'course_id' => $resolvedCourseId,
-                    'co_threshold' => $offeringData ? (float)($offeringData['co_threshold'] ?? 40) : 40.00,
-                    'passing_threshold' => $offeringData ? (float)($offeringData['passing_threshold'] ?? 60) : 60.00,
+                    'offering_id' => $offeringId,
+                    'course_id' => $course->getCourseId(),
+                    'co_threshold' => (float)$offering->getCoThreshold(),
+                    'passing_threshold' => (float)$offering->getPassingThreshold(),
+                    'direct_weightage' => (float)($offering->getDirectWeightage() ?? 80.0),
+                    'indirect_weightage' => (float)($offering->getIndirectWeightage() ?? 20.0),
                     'attainment_thresholds' => array_map(function ($scale) {
                         return [
                             'id' => $scale->id,
                             'level' => $scale->level,
-                            'percentage' => $scale->min_percentage
+                            'percentage' => $scale->min_percentage,
                         ];
-                    }, $scales)
-                ]
+                    }, $scales),
+                ],
             ];
 
             echo json_encode($response);
         } catch (Exception $e) {
+            if (isset($GLOBALS['fileLogger'])) {
+                $GLOBALS['fileLogger']->error('AttainmentController', 'getConfig prompt', ['error' => $e->getMessage()]);
+            }
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Failed to retrieve configuration: ' . $e->getMessage()]);
         }
     }
 
     /**
-     * Save attainment configuration for a course
-     * POST /courses/{courseId}/attainment-config
+     * Save attainment configuration for an offering
+     * POST /offerings/{offeringId}/attainment-config
      */
-    public function saveConfig(int $courseId): void
+    public function saveConfig(int $offeringId): void
     {
         $input = json_decode(file_get_contents('php://input'), true);
 
@@ -197,9 +516,10 @@ class AttainmentController
             return;
         }
 
-        // Validate required fields
         $coThreshold = $input['co_threshold'] ?? null;
         $passingThreshold = $input['passing_threshold'] ?? null;
+        $directWeightage = $input['direct_weightage'] ?? null;
+        $indirectWeightage = $input['indirect_weightage'] ?? null;
         $attainmentThresholds = $input['attainment_thresholds'] ?? [];
 
         if ($coThreshold !== null && ($coThreshold < 0 || $coThreshold > 100)) {
@@ -214,7 +534,6 @@ class AttainmentController
             return;
         }
 
-        // Validate attainment thresholds
         if (!is_array($attainmentThresholds) || empty($attainmentThresholds)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'At least one attainment threshold is required']);
@@ -235,29 +554,39 @@ class AttainmentController
             }
         }
 
-        try {
-            // Check if course exists and user has access
-            $resolved = $this->resolveCourseId($courseId);
-            if (!$resolved) {
-                http_response_code(404);
-                echo json_encode(['success' => false, 'message' => 'Course not found']);
+        if ($directWeightage !== null || $indirectWeightage !== null) {
+            $dw = (float)($directWeightage ?? 80.0);
+            $iw = (float)($indirectWeightage ?? 20.0);
+            if ($dw < 0 || $dw > 100 || $iw < 0 || $iw > 100) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Weightage values must be between 0 and 100']);
                 return;
             }
-            $resolvedCourseId = $resolved['course_id'];
+            if (abs(($dw + $iw) - 100) > 0.01) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Direct and indirect weightage must sum to 100']);
+                return;
+            }
+        }
 
-            // Update specific offering thresholds
-            if ($resolved['offering_id'] !== null) {
-                $this->offeringRepo->updateThresholds($resolved['offering_id'], $coThreshold, $passingThreshold);
-            } else {
-                $offerings = $this->offeringRepo->findByCourseId($resolvedCourseId);
-                if (!empty($offerings)) {
-                    $latestOfferingId = $offerings[0]['offering_id'];
-                    $this->offeringRepo->updateThresholds($latestOfferingId, $coThreshold, $passingThreshold);
-                }
+        try {
+            $resolved = $this->resolveOffering($offeringId);
+            if (!$resolved) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Course offering not found']);
+                return;
             }
 
-            // Prepare scale data with proper levels
-            // Sort by percentage descending to assign levels correctly
+            $this->offeringRepo->updateThresholds($offeringId, $coThreshold, $passingThreshold);
+
+            if ($directWeightage !== null || $indirectWeightage !== null) {
+                $this->offeringRepo->updateWeightage(
+                    $offeringId,
+                    (float)($directWeightage ?? 80.0),
+                    (float)($indirectWeightage ?? 20.0)
+                );
+            }
+
             usort($attainmentThresholds, function ($a, $b) {
                 return $b['percentage'] <=> $a['percentage'];
             });
@@ -266,56 +595,196 @@ class AttainmentController
             foreach ($attainmentThresholds as $index => $threshold) {
                 $scaleData[] = [
                     'level' => count($attainmentThresholds) - $index,
-                    'min_percentage' => $threshold['percentage']
+                    'min_percentage' => $threshold['percentage'],
                 ];
             }
 
-            // Save attainment scales
-            $this->scaleRepo->saveBulk($resolvedCourseId, $scaleData);
+            $this->scaleRepo->saveBulk($offeringId, $scaleData);
 
             http_response_code(200);
+
+            $auditPayload = isset($input) ? $input : null;
+            if (isset($this->auditService)) {
+                $this->auditService->log('UPDATE', 'Config', null, ($GLOBALS['audit_old_state'] ?? null), $auditPayload);
+            }
+            if (isset($GLOBALS['fileLogger'])) {
+                $GLOBALS['fileLogger']->log('INFO', 'AttainmentController', 'UPDATE operation successful in saveConfig');
+            }
             echo json_encode([
                 'success' => true,
                 'message' => 'Attainment configuration saved successfully',
                 'data' => [
-                    'course_id' => $resolvedCourseId,
+                    'offering_id' => $offeringId,
+                    'course_id' => $resolved['course']->getCourseId(),
                     'co_threshold' => $coThreshold,
                     'passing_threshold' => $passingThreshold,
-                    'attainment_thresholds_saved' => count($scaleData)
-                ]
+                    'direct_weightage' => (float)($directWeightage ?? 80.0),
+                    'indirect_weightage' => (float)($indirectWeightage ?? 20.0),
+                    'attainment_thresholds_saved' => count($scaleData),
+                ],
             ]);
         } catch (Exception $e) {
+            if (isset($GLOBALS['fileLogger'])) {
+                $GLOBALS['fileLogger']->error('AttainmentController', 'saveConfig prompt', ['error' => $e->getMessage()]);
+            }
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Failed to save configuration: ' . $e->getMessage()]);
         }
     }
 
     /**
-     * Delete attainment configuration for a course
-     * DELETE /attainment/config/{courseId}
+     * Delete attainment configuration for an offering
+     * DELETE /attainment/config/{offeringId}
      */
-    public function deleteConfig(int $courseId): void
+    public function deleteConfig(int $offeringId): void
     {
         try {
-            // Check if course exists
-            $course = $this->courseRepo->findById($courseId);
-            if (!$course) {
+            $resolved = $this->resolveOffering($offeringId);
+            if (!$resolved) {
                 http_response_code(404);
-                echo json_encode(['success' => false, 'message' => 'Course not found']);
+                echo json_encode(['success' => false, 'message' => 'Course offering not found']);
                 return;
             }
 
-            // Delete attainment scales
-            $this->scaleRepo->deleteByCourseId($courseId);
+            $this->scaleRepo->deleteByOfferingId($offeringId);
+
+            http_response_code(200);
+
+            if (isset($this->auditService)) {
+                $this->auditService->log('DELETE', 'Config', null, ($GLOBALS['audit_old_state'] ?? null), null);
+            }
+            if (isset($GLOBALS['fileLogger'])) {
+                $GLOBALS['fileLogger']->log('INFO', 'AttainmentController', 'DELETE operation successful in deleteConfig');
+            }
+            echo json_encode([
+                'success' => true,
+                'message' => 'Attainment configuration deleted successfully',
+            ]);
+        } catch (Exception $e) {
+            if (isset($GLOBALS['fileLogger'])) {
+                $GLOBALS['fileLogger']->error('AttainmentController', 'deleteConfig prompt', ['error' => $e->getMessage()]);
+            }
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Failed to delete configuration: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Get the latest attainment calculation job status for an offering
+     * GET /api/attainment/offering/{id}/status
+     */
+    public function getJobStatus(int $offeringId): void
+    {
+        try {
+            if (!$this->jobRepo) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Service not initialized']);
+                return;
+            }
+
+            $job = $this->jobRepo->getLatestJobStatus($offeringId);
+            
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'data' => $job
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Process pending attainment jobs (intended to be called via cron or background worker)
+     * POST /api/jobs/process
+     */
+    public function processJobs(): void
+    {
+        try {
+            if (!$this->jobRepo || !$this->snapshotService) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Service not initialized']);
+                return;
+            }
+
+            // Get up to 5 pending jobs
+            $jobs = $this->jobRepo->getPendingJobs(5);
+            $processed = 0;
+            $failed = 0;
+
+            foreach ($jobs as $job) {
+                try {
+                    $this->jobRepo->updateStatus($job['job_id'], 'processing');
+                    
+                    // Call the snapshot service to do the heavy lifting
+                    $this->snapshotService->calculateAndPersist($job['offering_id']);
+                    
+                    $this->jobRepo->updateStatus($job['job_id'], 'completed');
+                    $processed++;
+                } catch (Exception $e) {
+                    $this->jobRepo->updateStatus($job['job_id'], 'failed', $e->getMessage());
+                    $failed++;
+                }
+            }
 
             http_response_code(200);
             echo json_encode([
                 'success' => true,
-                'message' => 'Attainment configuration deleted successfully'
+                'message' => "Job processing finished",
+                'data' => [
+                    'processed' => $processed,
+                    'failed' => $failed,
+                    'total_pending_found' => count($jobs)
+                ]
             ]);
         } catch (Exception $e) {
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Failed to delete configuration: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Get available cohorts (programme + repeater status) that have attainment snapshots
+     * GET /api/attainment/offering/{id}/cohorts
+     */
+    public function getCohorts(int $offeringId): void
+    {
+        try {
+            if (!$this->snapshotRepo || !$this->programmeRepo) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Service not initialized']);
+                return;
+            }
+
+            // Find unique programme_id and is_repeater combinations from enrollments along with programme name
+            $stmt = $this->snapshotRepo->getDb()->prepare(
+                "SELECT DISTINCT s.programme_id, e.is_repeater, p.programme_name 
+                 FROM enrollments e
+                 JOIN students s ON s.roll_no = e.student_rollno
+                 JOIN programmes p ON s.programme_id = p.programme_id
+                 WHERE e.offering_id = ? AND e.enrollment_status != 'Dropped' AND s.programme_id IS NOT NULL"
+            );
+            $stmt->execute([$offeringId]);
+            $cohorts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $enrichedCohorts = [];
+            foreach ($cohorts as $c) {
+                $enrichedCohorts[] = [
+                    'programme_id' => $c['programme_id'],
+                    'programme_name' => $c['programme_name'],
+                    'is_repeater' => (bool)$c['is_repeater']
+                ];
+            }
+
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'data' => $enrichedCohorts
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
     }
 }

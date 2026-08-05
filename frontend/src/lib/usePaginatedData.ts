@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { debugLogger } from "./debugLogger";
 import type {
 	PaginatedResponse,
 	PaginationMeta,
@@ -9,7 +10,10 @@ export interface UsePaginatedDataOptions<
 	F extends Record<string, string | number | undefined>,
 > {
 	/** The async function that fetches a page */
-	fetchFn: (params: PaginationParams) => Promise<PaginatedResponse<unknown>>;
+	fetchFn: (
+		params: PaginationParams,
+		options?: { bypassCache?: boolean }
+	) => Promise<PaginatedResponse<unknown>>;
 	/** How many rows per page (default 20) */
 	limit?: number;
 	/** Default sort field */
@@ -43,7 +47,7 @@ export interface UsePaginatedDataReturn<
 	/** Jump back to page 1 */
 	reset: () => void;
 	/** Refresh the current page */
-	refresh: () => void;
+	refresh: (options?: { bypassCache?: boolean }) => void;
 	/** Current search string */
 	search: string;
 	/** Update search (triggers debounce + page reset) */
@@ -60,6 +64,10 @@ export interface UsePaginatedDataReturn<
 	setSort: (field: string, dir?: "ASC" | "DESC") => void;
 	/** Current zero-based page index (for display) */
 	pageIndex: number;
+	/** Current page size limit */
+	limit: number;
+	/** Change the page size limit dynamically */
+	setLimit: (limit: number) => void;
 }
 
 /**
@@ -89,7 +97,7 @@ export function usePaginatedData<
 	searchDebounceMs = 300,
 }: UsePaginatedDataOptions<F>): UsePaginatedDataReturn<T, F> {
 	const [data, setData] = useState<T[]>([]);
-	const [loading, setLoading] = useState(false);
+	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [pagination, setPagination] = useState<PaginationMeta | null>(null);
 
@@ -106,6 +114,7 @@ export function usePaginatedData<
 	);
 	const [sort, setSort] = useState(defaultSort);
 	const [sortDir, setSortDir] = useState<"ASC" | "DESC">(defaultSortDir);
+	const [limitState, setLimitState] = useState(limit);
 
 	const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const fetchFnRef = useRef(fetchFn);
@@ -117,12 +126,19 @@ export function usePaginatedData<
 	// Derive current cursor from cursor stack
 	const currentCursor = cursorStack[pageIndex];
 
-	const doFetch = useCallback(async () => {
+	const doFetch = useCallback(async (options?: { bypassCache?: boolean }) => {
+		debugLogger.debug("usePaginatedData", "doFetch triggering", {
+			pageIndex,
+			limit: limitState,
+			search,
+			filters,
+			options,
+		});
 		setLoading(true);
 		setError(null);
 		try {
 			const params: PaginationParams = {
-				limit,
+				limit: limitState,
 				// Include required sort props even if they are empty
 				sort: sort || undefined,
 				sort_dir: sortDir || undefined,
@@ -136,22 +152,27 @@ export function usePaginatedData<
 				...(filters as Record<string, string | number | undefined>),
 			};
 
-			const response = await (fetchFnRef.current(params) as Promise<
+			const response = await (fetchFnRef.current(params, options) as Promise<
 				PaginatedResponse<T>
 			>);
+			debugLogger.debug("usePaginatedData", "doFetch success", {
+				count: response.data.length,
+				responseData: response.data,
+			});
 			setData(response.data);
 			setPagination(response.pagination);
 		} catch (err) {
+			debugLogger.error("usePaginatedData", "doFetch error", err);
 			setError(err instanceof Error ? err.message : "Unknown error");
 		} finally {
 			setLoading(false);
 		}
-	}, [limit, currentCursor, sort, sortDir, search, filters]); // removed fetchFn dependency
+	}, [limitState, currentCursor, sort, sortDir, search, filters]); // removed fetchFn dependency
 
 	useEffect(() => {
 		// Only run when pagination state changes
 		doFetch();
-	}, [limit, currentCursor, sort, sortDir, search, filters]);
+	}, [limitState, currentCursor, sort, sortDir, search, filters]);
 
 	const goNext = useCallback(() => {
 		if (!pagination?.next_cursor) return;
@@ -177,8 +198,8 @@ export function usePaginatedData<
 		setPageIndex(0);
 	}, []);
 
-	const refresh = useCallback(() => {
-		doFetch();
+	const refresh = useCallback((options?: { bypassCache?: boolean }) => {
+		doFetch(options);
 	}, [doFetch]);
 
 	const setSearch = useCallback(
@@ -216,6 +237,12 @@ export function usePaginatedData<
 	// but swap search ref to debounced value via setSearch
 	void searchInput; // consumed via setSearch / setSearchInput path
 
+	const setLimit = useCallback((newLimit: number) => {
+		setLimitState(newLimit);
+		setCursorStack([undefined]);
+		setPageIndex(0);
+	}, []);
+
 	return {
 		data,
 		loading,
@@ -234,5 +261,7 @@ export function usePaginatedData<
 		sortDir,
 		setSort: setSortFn,
 		pageIndex,
+		limit: limitState,
+		setLimit,
 	};
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,25 +18,13 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { DataTable } from "@/components/shared/DataTable";
-import type { ColumnDef } from "@tanstack/react-table";
-import {
-	ArrowUpDown,
-	Building2,
-	UserPlus,
-	UserMinus,
-	Users,
-	History,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/features/shared/DataTable";
+import { Building2, UserPlus, UserMinus, History } from "lucide-react";
 import { toast } from "sonner";
-import {
-	deanApi,
-	type DeanDepartment,
-	type HODHistoryRecord,
-} from "@/services/api";
+import { deanApi, type DeanDepartment } from "@/services/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { generateAppointmentOrder } from "@/utils/appointmentUtils";
+import { getStatusColumns, getHistoryColumns } from "./HODManagement.columns";
 
 interface HODManagementProps {
 	departments: DeanDepartment[];
@@ -181,224 +169,16 @@ export function HODManagement({
 		}
 	};
 
-	const statusColumns: ColumnDef<DeanDepartment>[] = [
-		{
-			accessorKey: "department_code",
-			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() =>
-							column.toggleSorting(column.getIsSorted() === "asc")
-						}
-					>
-						Code
-						<ArrowUpDown className="ml-2 h-4 w-4" />
-					</Button>
-				);
-			},
-			cell: ({ row }) => (
-				<Badge
-					variant="secondary"
-					className="bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300"
-				>
-					{row.getValue("department_code")}
-				</Badge>
-			),
-		},
-		{
-			accessorKey: "department_name",
-			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						className="mr-auto"
-						onClick={() =>
-							column.toggleSorting(column.getIsSorted() === "asc")
-						}
-					>
-						Department
-						<ArrowUpDown className="ml-2 h-4 w-4" />
-					</Button>
-				);
-			},
-			cell: ({ row }) => (
-				<div className="font-medium flex">
-					{row.getValue("department_name")}
-				</div>
-			),
-		},
-		{
-			accessorKey: "hod_name",
-			header: "Serving HOD",
-			cell: ({ row }) => {
-				const hod = row.getValue("hod_name") as string;
-				return hod ? (
-					<Badge
-						variant="secondary"
-						className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
-					>
-						{hod}
-					</Badge>
-				) : (
-					<Badge
-						variant="secondary"
-						className="bg-gray-50 text-gray-700 dark:bg-gray-950 dark:text-gray-300 border-gray-200 dark:border-gray-800"
-					>
-						No HOD
-					</Badge>
-				);
-			},
-		},
-		{
-			accessorKey: "faculty_count",
-			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						className="mr-auto"
-						onClick={() =>
-							column.toggleSorting(column.getIsSorted() === "asc")
-						}
-					>
-						Faculty Count
-						<ArrowUpDown className="ml-2 h-4 w-4" />
-					</Button>
-				);
-			},
-			cell: ({ row }) => (
-				<div className="flex items-center gap-2 ml-4">
-					<Users className="w-4 h-4 text-muted-foreground" />
-					{row.getValue("faculty_count")}
-				</div>
-			),
-		},
-		{
-			id: "actions",
-			cell: ({ row }) => {
-				const dept = row.original;
-				return (
-					<div className="text-right">
-						{dept.hod_name ? (
-							<Button
-								size="sm"
-								variant="outline"
-								onClick={() => handleDemoteClick(dept)}
-							>
-								Replace Serving HOD
-							</Button>
-						) : (
-							<Button
-								size="sm"
-								onClick={() => handleAppointClick(dept)}
-							>
-								<UserPlus className="w-4 h-4 mr-2" />
-								Record Serving HOD
-							</Button>
-						)}
-					</div>
-				);
-			},
-		},
-	];
+	const statusColumns = useMemo(
+		() =>
+			getStatusColumns({
+				onAppointClick: handleAppointClick,
+				onDemoteClick: handleDemoteClick,
+			}),
+		[],
+	);
 
-	const historyColumns: ColumnDef<HODHistoryRecord>[] = [
-		{
-			accessorKey: "department_code",
-			header: "Dept",
-			cell: ({ row }) => (
-				<Badge
-					variant="secondary"
-					className="bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300"
-				>
-					{row.getValue("department_code")}
-				</Badge>
-			),
-		},
-		{
-			accessorKey: "username",
-			header: ({ column }) => (
-				<Button
-					variant="ghost"
-					className="mr-auto"
-					onClick={() =>
-						column.toggleSorting(column.getIsSorted() === "asc")
-					}
-				>
-					Faculty Name
-					<ArrowUpDown className="ml-2 h-4 w-4" />
-				</Button>
-			),
-			cell: ({ row }) => (
-				<div className="font-medium">
-					{row.getValue("username")}
-					<div className="text-xs text-muted-foreground font-normal">
-						{(row.original as HODHistoryRecord).email}
-					</div>
-				</div>
-			),
-		},
-		{
-			accessorKey: "appointment_order",
-			header: "Appointment Order",
-			cell: ({ row }) => (
-				<span className="text-sm font-mono text-muted-foreground">
-					{(row.getValue("appointment_order") as string | null) ??
-						"—"}
-				</span>
-			),
-		},
-		{
-			accessorKey: "start_date",
-			header: ({ column }) => (
-				<Button
-					variant="ghost"
-					onClick={() =>
-						column.toggleSorting(column.getIsSorted() === "asc")
-					}
-				>
-					Start Date
-					<ArrowUpDown className="ml-2 h-4 w-4" />
-				</Button>
-			),
-			cell: ({ row }) => (
-				<span className="text-sm">
-					{new Date(row.getValue("start_date")).toLocaleDateString()}
-				</span>
-			),
-		},
-		{
-			accessorKey: "end_date",
-			header: "End Date",
-			cell: ({ row }) => {
-				const end = row.getValue("end_date") as string | null;
-				return (
-					<span className="text-sm">
-						{end ? new Date(end).toLocaleDateString() : "—"}
-					</span>
-				);
-			},
-		},
-		{
-			accessorKey: "is_current",
-			header: "Status",
-			cell: ({ row }) => {
-				const current = row.getValue("is_current") as number;
-				return current ? (
-					<Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-						Current
-					</Badge>
-				) : (
-					<Badge
-						variant="secondary"
-						className="bg-gray-50 text-gray-600 dark:bg-gray-950 dark:text-gray-400"
-					>
-						Past
-					</Badge>
-				);
-			},
-		},
-	];
+	const historyColumns = useMemo(() => getHistoryColumns(), []);
 
 	if (isLoading) {
 		return (
@@ -414,52 +194,55 @@ export function HODManagement({
 	return (
 		<div className="space-y-6">
 			{/* Summary Cards */}
-			<div className="grid gap-4 md:grid-cols-3">
-				<Card>
+			<div className="grid gap-6 md:grid-cols-3">
+				<Card className="bg-card/85 backdrop-blur-md border border-muted/50 rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 relative group">
+					<div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-blue-500 via-teal-500 to-transparent"></div>
 					<CardContent className="pt-6">
 						<div className="flex items-center gap-4">
-							<div className="p-3 bg-purple-50 dark:bg-purple-950 rounded-lg">
-								<Building2 className="w-6 h-6 text-purple-500" />
+							<div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform duration-200">
+								<Building2 className="w-6 h-6" />
 							</div>
 							<div>
-								<p className="text-2xl font-bold">
+								<p className="text-3xl font-extrabold text-blue-600 dark:text-blue-400">
 									{departments.length}
 								</p>
-								<p className="text-sm text-muted-foreground">
+								<p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-0.5">
 									Total Departments
 								</p>
 							</div>
 						</div>
 					</CardContent>
 				</Card>
-				<Card>
+				<Card className="bg-card/85 backdrop-blur-md border border-muted/50 rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 relative group">
+					<div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-emerald-500 via-teal-500 to-transparent"></div>
 					<CardContent className="pt-6">
 						<div className="flex items-center gap-4">
-							<div className="p-3 bg-green-50 dark:bg-green-950 rounded-lg">
-								<UserPlus className="w-6 h-6 text-green-500" />
+							<div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform duration-200">
+								<UserPlus className="w-6 h-6" />
 							</div>
 							<div>
-								<p className="text-2xl font-bold">
+								<p className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">
 									{departmentsWithHOD.length}
 								</p>
-								<p className="text-sm text-muted-foreground">
+								<p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-0.5">
 									Departments with HOD
 								</p>
 							</div>
 						</div>
 					</CardContent>
 				</Card>
-				<Card>
+				<Card className="bg-card/85 backdrop-blur-md border border-muted/50 rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 relative group">
+					<div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-amber-500 via-orange-500 to-transparent"></div>
 					<CardContent className="pt-6">
 						<div className="flex items-center gap-4">
-							<div className="p-3 bg-orange-50 dark:bg-orange-950 rounded-lg">
-								<UserMinus className="w-6 h-6 text-orange-500" />
+							<div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform duration-200">
+								<UserMinus className="w-6 h-6" />
 							</div>
 							<div>
-								<p className="text-2xl font-bold">
+								<p className="text-3xl font-extrabold text-amber-600 dark:text-amber-400">
 									{departmentsWithoutHOD.length}
 								</p>
-								<p className="text-sm text-muted-foreground">
+								<p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-0.5">
 									Departments without HOD
 								</p>
 							</div>
@@ -469,27 +252,33 @@ export function HODManagement({
 			</div>
 
 			{/* Tabs: HOD Status + Assignment History */}
-			<Tabs defaultValue="status">
-				<TabsList>
-					<TabsTrigger value="status">
-						<Building2 className="w-4 h-4 mr-2" />
-						HOD Status
-					</TabsTrigger>
-					<TabsTrigger
-						value="history"
-						onClick={() => refetchHistory()}
-					>
-						<History className="w-4 h-4 mr-2" />
-						Assignment History
-					</TabsTrigger>
-				</TabsList>
+			<Tabs defaultValue="status" className="w-full">
+				<div className="flex flex-wrap gap-4 items-center justify-between mb-4 bg-card/40 border border-muted/50 rounded-xl p-2 backdrop-blur-sm w-fit">
+					<TabsList className="bg-muted/50 p-1 rounded-lg">
+						<TabsTrigger value="status" className="px-4 py-1.5 text-xs font-semibold rounded-md data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm transition-all duration-200">
+							<Building2 className="w-4 h-4 mr-2 text-blue-500" />
+							HOD Status
+						</TabsTrigger>
+						<TabsTrigger
+							value="history"
+							onClick={() => refetchHistory()}
+							className="px-4 py-1.5 text-xs font-semibold rounded-md data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm transition-all duration-200"
+						>
+							<History className="w-4 h-4 mr-2 text-teal-500" />
+							Assignment History
+						</TabsTrigger>
+					</TabsList>
+				</div>
 
-				<TabsContent value="status">
-					<Card>
-						<CardHeader>
-							<CardTitle>Department HOD Status</CardTitle>
+				<TabsContent value="status" className="mt-0">
+					<Card className="bg-card/85 backdrop-blur-md border border-muted/50 rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 relative">
+						<div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-blue-500 via-teal-500 to-transparent"></div>
+						<CardHeader className="pb-4 border-b bg-muted/[.06] pt-5">
+							<CardTitle className="text-base font-bold bg-gradient-to-r from-foreground to-foreground/85 bg-clip-text">
+								Department HOD Status
+							</CardTitle>
 						</CardHeader>
-						<CardContent>
+						<CardContent className="pt-6">
 							<DataTable
 								columns={statusColumns}
 								data={departments}
@@ -501,15 +290,19 @@ export function HODManagement({
 					</Card>
 				</TabsContent>
 
-				<TabsContent value="history">
-					<Card>
-						<CardHeader>
-							<CardTitle>HOD Assignment History</CardTitle>
+				<TabsContent value="history" className="mt-0">
+					<Card className="bg-card/85 backdrop-blur-md border border-muted/50 rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 relative">
+						<div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-teal-500 via-blue-500 to-transparent"></div>
+						<CardHeader className="pb-4 border-b bg-muted/[.06] pt-5">
+							<CardTitle className="text-base font-bold bg-gradient-to-r from-foreground to-foreground/85 bg-clip-text">
+								HOD Assignment History
+							</CardTitle>
 						</CardHeader>
-						<CardContent>
+						<CardContent className="pt-6">
 							{loadingHistory ? (
 								<div className="flex items-center justify-center h-32">
-									<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500" />
+									<History className="animate-spin h-6 w-6 text-teal-500 mr-2" />
+									<span className="text-muted-foreground">Loading history...</span>
 								</div>
 							) : (
 								<DataTable
@@ -530,22 +323,23 @@ export function HODManagement({
 				open={appointDialogOpen}
 				onOpenChange={setAppointDialogOpen}
 			>
-				<DialogContent className="max-w-md">
-					<DialogHeader>
-						<DialogTitle>
+				<DialogContent className="max-w-md border border-muted/50 bg-card/95 backdrop-blur-lg rounded-2xl shadow-2xl overflow-hidden">
+					<div className="absolute top-0 left-0 w-full h-[4px] bg-gradient-to-r from-blue-500 to-teal-500"></div>
+					<DialogHeader className="pt-2">
+						<DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
 							{selectedDepartment?.hod_name
 								? "Assign New HOD"
 								: "Record Serving HOD"}
 						</DialogTitle>
-						<DialogDescription>
+						<DialogDescription className="text-sm text-muted-foreground/90 mt-1">
 							{selectedDepartment?.hod_name
-								? `Assign new HOD (${selectedDepartment.hod_name}) for ${selectedDepartment.department_name}`
+								? `Assign new HOD (replacing ${selectedDepartment.hod_name}) for ${selectedDepartment.department_name}`
 								: `Record the serving Head of Department for ${selectedDepartment?.department_name}`}
 						</DialogDescription>
 					</DialogHeader>
-					<div className="space-y-4">
+					<div className="space-y-5 pt-3">
 						<div className="space-y-2">
-							<Label htmlFor="appointment-order">
+							<Label htmlFor="appointment-order" className="text-sm font-semibold text-foreground/90">
 								Appointment Order No.
 							</Label>
 							<Input
@@ -555,19 +349,20 @@ export function HODManagement({
 									setAppointmentOrder(e.target.value)
 								}
 								placeholder="e.g. ORD/HOD/2026/01"
+								className="border-muted/65 focus-visible:ring-blue-500/50 rounded-lg"
 							/>
 						</div>
 
 						<div className="space-y-2">
-							<Label>Select Faculty / Staff Member</Label>
+							<Label className="text-sm font-semibold text-foreground/90">Select Faculty / Staff Member</Label>
 							{loadingFaculty ? (
-								<div className="text-sm text-muted-foreground">
-									Loading...
+								<div className="text-sm text-muted-foreground flex items-center gap-2 py-1">
+									<span className="h-4 w-4 animate-spin rounded-full border-2 border-muted border-t-transparent"></span>
+									Loading members...
 								</div>
 							) : facultyMembers.length === 0 ? (
-								<div className="text-sm text-muted-foreground">
-									No faculty members available in this
-									department
+								<div className="text-sm text-muted-foreground py-1">
+									No faculty members available in this department
 								</div>
 							) : (
 								<Select
@@ -576,10 +371,10 @@ export function HODManagement({
 										setSelectedFaculty(value)
 									}
 								>
-									<SelectTrigger>
+									<SelectTrigger className="border-muted/65 focus:ring-blue-500/50 rounded-lg">
 										<SelectValue placeholder="Choose a faculty member" />
 									</SelectTrigger>
-									<SelectContent>
+									<SelectContent className="border-muted/50">
 										{facultyMembers.map(
 											(faculty: {
 												employee_id: number;
@@ -590,8 +385,7 @@ export function HODManagement({
 													key={faculty.employee_id}
 													value={faculty.employee_id.toString()}
 												>
-													{faculty.username} (
-													{faculty.email})
+													{faculty.username} ({faculty.email})
 												</SelectItem>
 											),
 										)}
@@ -600,7 +394,8 @@ export function HODManagement({
 							)}
 						</div>
 
-						<div className="rounded-md bg-muted/50 border p-3 text-sm text-muted-foreground">
+						<div className="rounded-xl bg-blue-500/5 border border-blue-500/10 p-4 text-xs text-muted-foreground leading-relaxed">
+							<strong className="text-blue-600 dark:text-blue-400 block mb-1">Record-only Assignment</strong>
 							This is a record-only assignment. The selected
 							member will be recorded as the serving HOD. Their
 							login role will NOT change — the HOD interface is
@@ -608,14 +403,14 @@ export function HODManagement({
 							(e.g.&nbsp;hod_cse@tezu.ac.in).
 						</div>
 
-						<div className="flex gap-2 pt-4">
+						<div className="flex gap-3 pt-3">
 							<Button
 								variant="outline"
 								onClick={() => {
 									setAppointDialogOpen(false);
 									resetForm();
 								}}
-								className="flex-1"
+								className="flex-1 border-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all duration-200 active:scale-95 rounded-lg"
 							>
 								Cancel
 							</Button>
@@ -625,14 +420,19 @@ export function HODManagement({
 									appointMutation.isPending ||
 									demoteMutation.isPending
 								}
-								className="flex-1"
+								className="flex-1 bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-500 hover:to-teal-500 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 active:scale-95 border-none rounded-lg"
 							>
 								{appointMutation.isPending ||
-								demoteMutation.isPending
-									? "Processing..."
-									: selectedDepartment?.hod_name
-										? "Assign New HOD"
-										: "Record Serving HOD"}
+								demoteMutation.isPending ? (
+									<span className="flex items-center justify-center gap-2">
+										<span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+										Processing...
+									</span>
+								) : selectedDepartment?.hod_name ? (
+									"Assign New HOD"
+								) : (
+									"Record Serving HOD"
+								)}
 							</Button>
 						</div>
 					</div>

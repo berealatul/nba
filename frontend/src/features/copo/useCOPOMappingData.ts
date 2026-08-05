@@ -1,0 +1,935 @@
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { toast } from "sonner";
+import { apiService } from "@/services/api";
+import { attainmentApi } from "@/services/api/attainment";
+import { debugLogger } from "@/lib/debugLogger";
+import type {
+	StudentMarks,
+	AttainmentThreshold,
+	COPOMatrixState,
+} from "./types";
+import {
+	calculateCOAttainment,
+	calculateCOMaxMarks,
+	calculatePOComputations,
+} from "./computations";
+import { getAttainmentCriteria } from "./utils";
+
+export interface UseCOPOMappingDataProps {
+	courseId: number;
+	courseCode: string;
+	facultyName: string;
+	departmentName: string;
+	year: string | number;
+	semester: string | number;
+	courseName: string;
+}
+
+export function useCOPOMappingData({
+	courseId,
+	courseCode,
+	facultyName,
+	departmentName,
+	year,
+	semester,
+	courseName,
+}: UseCOPOMappingDataProps) {
+	const [loading, setLoading] = useState(true);
+	const [studentsData, setStudentsData] = useState<StudentMarks[]>([]);
+	const [maxMarks, setMaxMarks] = useState<{
+		[testName: string]: {
+			total: number;
+			CO1: number;
+			CO2: number;
+			CO3: number;
+			CO4: number;
+			CO5: number;
+			CO6: number;
+		};
+	}>({});
+
+	const [showSettings, setShowSettings] = useState(false);
+	const [snapshotIndirectData, setSnapshotIndirectData] = useState<
+		Array<{
+			co_name: string;
+			attainment_percentage: number;
+			attainment_level: number;
+			indirect_attainment_percentage?: number | null;
+			indirect_attainment_level?: number | null;
+			final_attainment_percentage?: number | null;
+			final_attainment_level?: number | null;
+		}>
+	>();
+	const [snapshotPoData, setSnapshotPoData] = useState<
+		Array<{
+			po_name: string;
+			attainment_value: number;
+			final_attainment_value?: number | null;
+		}>
+	>();
+	const [cohorts, setCohorts] = useState<import('@/services/api/types').AttainmentCohort[]>([]);
+	const [selectedCohort, setSelectedCohort] = useState<{
+		programmeId?: number;
+		isRepeater?: boolean;
+	}>({});
+	const [jobStatus, setJobStatus] = useState<import('@/services/api/types').AttainmentJobStatus | null>(null);
+	const [attainmentThresholds, setAttainmentThresholds] = useState<
+		AttainmentThreshold[]
+	>([
+		{ id: 1, percentage: 70 },
+		{ id: 2, percentage: 60 },
+		{ id: 3, percentage: 50 },
+	]);
+	const [coThreshold, setCoThreshold] = useState(40);
+	const [passingThreshold, setPassingThreshold] = useState(60);
+	const [directWeightage, setDirectWeightage] = useState(80);
+	const [indirectWeightage, setIndirectWeightage] = useState(20);
+
+	const [copoMatrix, setCopoMatrix] = useState<COPOMatrixState>({
+		CO1: {
+			PO1: 0,
+			PO2: 0,
+			PO3: 0,
+			PO4: 0,
+			PO5: 0,
+			PO6: 0,
+			PO7: 0,
+			PO8: 0,
+			PO9: 0,
+			PO10: 0,
+			PO11: 0,
+			PO12: 0,
+			PSO1: 0,
+			PSO2: 0,
+			PSO3: 0,
+		},
+		CO2: {
+			PO1: 0,
+			PO2: 0,
+			PO3: 0,
+			PO4: 0,
+			PO5: 0,
+			PO6: 0,
+			PO7: 0,
+			PO8: 0,
+			PO9: 0,
+			PO10: 0,
+			PO11: 0,
+			PO12: 0,
+			PSO1: 0,
+			PSO2: 0,
+			PSO3: 0,
+		},
+		CO3: {
+			PO1: 0,
+			PO2: 0,
+			PO3: 0,
+			PO4: 0,
+			PO5: 0,
+			PO6: 0,
+			PO7: 0,
+			PO8: 0,
+			PO9: 0,
+			PO10: 0,
+			PO11: 0,
+			PO12: 0,
+			PSO1: 0,
+			PSO2: 0,
+			PSO3: 0,
+		},
+		CO4: {
+			PO1: 0,
+			PO2: 0,
+			PO3: 0,
+			PO4: 0,
+			PO5: 0,
+			PO6: 0,
+			PO7: 0,
+			PO8: 0,
+			PO9: 0,
+			PO10: 0,
+			PO11: 0,
+			PO12: 0,
+			PSO1: 0,
+			PSO2: 0,
+			PSO3: 0,
+		},
+		CO5: {
+			PO1: 0,
+			PO2: 0,
+			PO3: 0,
+			PO4: 0,
+			PO5: 0,
+			PO6: 0,
+			PO7: 0,
+			PO8: 0,
+			PO9: 0,
+			PO10: 0,
+			PO11: 0,
+			PO12: 0,
+			PSO1: 0,
+			PSO2: 0,
+			PSO3: 0,
+		},
+		CO6: {
+			PO1: 0,
+			PO2: 0,
+			PO3: 0,
+			PO4: 0,
+			PO5: 0,
+			PO6: 0,
+			PO7: 0,
+			PO8: 0,
+			PO9: 0,
+			PO10: 0,
+			PO11: 0,
+			PO12: 0,
+			PSO1: 0,
+			PSO2: 0,
+			PSO3: 0,
+		},
+	});
+
+	const [saving, setSaving] = useState(false);
+
+	useEffect(() => {
+		loadCohortsAndJobStatus();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [courseId]);
+
+	useEffect(() => {
+		loadCOPOData();
+		loadAttainmentConfig();
+		loadMatrix();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [courseId, selectedCohort.programmeId, selectedCohort.isRepeater]);
+
+	const loadCohortsAndJobStatus = useCallback(async () => {
+		try {
+			const [fetchedCohorts, fetchedStatus] = await Promise.all([
+				attainmentApi.getCohorts(courseId).catch(() => []),
+				attainmentApi.getJobStatus(courseId).catch(() => null)
+			]);
+			if (fetchedCohorts && Array.isArray(fetchedCohorts)) {
+				setCohorts(fetchedCohorts);
+			}
+			if (fetchedStatus) {
+				setJobStatus(fetchedStatus);
+			}
+		} catch (e) {
+			console.error("Failed to load cohorts or job status", e);
+		}
+	}, [courseId]);
+
+	const loadMatrix = useCallback(async () => {
+		try {
+			debugLogger.info("COPOMapping", "loadMatrix called");
+			const mappings = await apiService.getCoPoMatrix(courseId);
+			if (mappings && mappings.length > 0) {
+				setCopoMatrix((prevMatrix) => {
+					const newMatrix = JSON.parse(JSON.stringify(prevMatrix)); // Deep clone
+					mappings.forEach((m) => {
+						const co = m.co_name as keyof COPOMatrixState;
+						const po = m.po_name;
+						if (newMatrix[co]) {
+							// eslint-disable-next-line @typescript-eslint/no-explicit-any
+							(newMatrix[co] as any)[po] = m.value;
+						}
+					});
+					return newMatrix;
+				});
+			}
+		} catch (error) {
+			debugLogger.error(
+				"COPOMapping",
+				"Failed to load CO-PO matrix",
+				error,
+			);
+			console.error("Failed to load CO-PO matrix:", error);
+		}
+	}, [courseId]);
+
+	const loadAttainmentConfig = useCallback(async () => {
+		try {
+			debugLogger.info("COPOMapping", "loadAttainmentConfig called");
+			const config = await apiService.getAttainmentConfig(courseId);
+
+			setCoThreshold(config.co_threshold);
+			setPassingThreshold(config.passing_threshold);
+			setDirectWeightage(config.direct_weightage ?? 80);
+			setIndirectWeightage(config.indirect_weightage ?? 20);
+
+			if (
+				config.attainment_thresholds &&
+				config.attainment_thresholds.length > 0
+			) {
+				setAttainmentThresholds(
+					config.attainment_thresholds.map((t) => ({
+						id: t.id,
+						percentage: t.percentage,
+					})),
+				);
+			}
+		} catch (error) {
+			debugLogger.error(
+				"COPOMapping",
+				"Failed to load attainment configuration",
+				error,
+			);
+			console.error("Failed to load attainment configuration:", error);
+			toast.info("Using default attainment configuration");
+		}
+	}, [courseId]);
+
+	const loadCOPOData = useCallback(async () => {
+		try {
+			debugLogger.info("COPOMapping", "loadCOPOData called");
+			setLoading(true);
+			setSnapshotIndirectData(undefined);
+			setSnapshotPoData(undefined);
+			const testsData = await apiService.getCourseTests(courseId);
+
+			if (testsData.length === 0) {
+				setStudentsData([]);
+				setLoading(false);
+				return;
+			}
+
+			const allMarksPromises = testsData.map((test) =>
+				apiService
+					.getTestMarks(test.id)
+					.then((data) => ({ test, marksData: data }))
+					.catch((error) => {
+						console.error(`Failed to fetch marks for test ${test.id}:`, error);
+						return { test, marksData: null };
+					}),
+			);
+
+			const allMarksResults = await Promise.all(allMarksPromises);
+
+			const studentMap = new Map<string, StudentMarks>();
+			const maxMarksMap: typeof maxMarks = {};
+
+			testsData.forEach((test) => {
+				maxMarksMap[test.name] = {
+					total: test.full_marks,
+					CO1: 0,
+					CO2: 0,
+					CO3: 0,
+					CO4: 0,
+					CO5: 0,
+					CO6: 0,
+				};
+			});
+
+			allMarksResults.forEach(({ test, marksData }) => {
+				if (!marksData || !marksData.marks) return;
+
+				marksData.marks.forEach((markRecord) => {
+					const studentId = markRecord.student_id;
+					const studentName = markRecord.student_name || studentId;
+
+					if (!studentMap.has(studentId)) {
+						studentMap.set(studentId, {
+							rollNo: studentId,
+							name: studentName,
+							programmeId: markRecord.programme_id,
+							programmeName: markRecord.programme_name,
+							is_repeater: markRecord.is_repeater,
+							absentee: "",
+							tests: {},
+							total: 0,
+							coTotals: {
+								CO1: 0,
+								CO2: 0,
+								CO3: 0,
+								CO4: 0,
+								CO5: 0,
+								CO6: 0,
+								ΣCO: 0,
+							},
+						});
+					}
+
+					const student = studentMap.get(studentId)!;
+					student.tests[test.name] = {
+						CO1: Number(markRecord.CO1) || 0,
+						CO2: Number(markRecord.CO2) || 0,
+						CO3: Number(markRecord.CO3) || 0,
+						CO4: Number(markRecord.CO4) || 0,
+						CO5: Number(markRecord.CO5) || 0,
+						CO6: Number(markRecord.CO6) || 0,
+					};
+				});
+			});
+
+			// Parallelize assessment loading
+			const assessmentPromises = testsData.map((test) =>
+				apiService
+					.getAssessment(test.id)
+					.then((assessmentData) => ({ test, questions: assessmentData.questions }))
+					.catch((error) => {
+						console.error(`Failed to load questions for test ${test.name}:`, error);
+						return { test, questions: [] };
+					}),
+			);
+
+			const assessmentResults = await Promise.all(assessmentPromises);
+
+			assessmentResults.forEach(({ test, questions }) => {
+				questions.forEach((q) => {
+					const coKey =
+						`CO${q.co}` as keyof (typeof maxMarksMap)[string];
+					if (maxMarksMap[test.name][coKey] !== undefined) {
+						maxMarksMap[test.name][coKey] += q.max_marks;
+					}
+				});
+			});
+
+			studentMap.forEach((student) => {
+				let totalMarks = 0;
+				const coTotals = {
+					CO1: 0,
+					CO2: 0,
+					CO3: 0,
+					CO4: 0,
+					CO5: 0,
+					CO6: 0,
+				};
+				const coMaxTotals = {
+					CO1: 0,
+					CO2: 0,
+					CO3: 0,
+					CO4: 0,
+					CO5: 0,
+					CO6: 0,
+				};
+
+				Object.keys(student.tests).forEach((testName) => {
+					const testMarks = student.tests[testName];
+					const testMaxMarks = maxMarksMap[testName];
+
+					Object.keys(testMarks).forEach((co) => {
+						const coKey = co as keyof typeof coTotals;
+						const coMarks = testMarks[coKey];
+						const coMax = testMaxMarks[coKey] || 0;
+
+						coTotals[coKey] += coMarks;
+						coMaxTotals[coKey] += coMax;
+						totalMarks += coMarks;
+					});
+				});
+
+				let totalMaxMarks = 0;
+				Object.keys(coTotals).forEach((co) => {
+					const coKey = co as keyof typeof coTotals;
+					const coMax = coMaxTotals[coKey];
+					totalMaxMarks += coMax;
+					student.coTotals[coKey] =
+						coMax > 0 ? (coTotals[coKey] / coMax) * 100 : 0;
+				});
+
+				const nonZeroCOs = Object.keys(coTotals).filter(
+					(co) => coMaxTotals[co as keyof typeof coMaxTotals] > 0,
+				);
+				const sumCO =
+					nonZeroCOs.reduce(
+						(sum, co) =>
+							sum + student.coTotals[co as keyof typeof coTotals],
+						0,
+					) / (nonZeroCOs.length || 1);
+
+				student.coTotals.ΣCO = sumCO;
+				student.total =
+					totalMaxMarks > 0 ? (totalMarks / totalMaxMarks) * 100 : 0;
+			});
+
+			setMaxMarks(maxMarksMap);
+
+			let finalStudents = Array.from(studentMap.values());
+			if (selectedCohort.programmeId !== undefined) {
+				finalStudents = finalStudents.filter((s) => s.programmeId !== undefined && Number(s.programmeId) === Number(selectedCohort.programmeId));
+			}
+			if (selectedCohort.isRepeater !== undefined) {
+				finalStudents = finalStudents.filter((s) => s.is_repeater !== undefined && Boolean(s.is_repeater) === Boolean(selectedCohort.isRepeater));
+			}
+
+			setStudentsData(finalStudents);
+			setLoading(false);
+
+			// Snapshot verification: attempt to fetch persisted attainment for comparison
+			try {
+				const snapshot = await attainmentApi.getOfferingAttainment(courseId, selectedCohort.programmeId, selectedCohort.isRepeater);
+				const coData = snapshot.co_attainment?.map((c) => ({
+					co_name: c.co_name,
+					attainment_percentage: c.attainment_percentage,
+					attainment_level: c.attainment_level,
+					indirect_attainment_percentage: c.indirect_attainment_percentage ?? null,
+					indirect_attainment_level: c.indirect_attainment_level ?? null,
+					final_attainment_percentage: c.final_attainment_percentage ?? null,
+					final_attainment_level: c.final_attainment_level ?? null,
+				}));
+				setSnapshotIndirectData(coData);
+
+				const poData = snapshot.po_attainment?.map((p) => ({
+					po_name: p.po_name,
+					attainment_value: p.attainment_value,
+					final_attainment_value: p.final_attainment_value ?? null,
+				}));
+				setSnapshotPoData(poData);
+				debugLogger.info("COPOMapping", "Snapshot fetch result", {
+					courseId,
+					hasSnapshot: snapshot.co_attainment?.length > 0 || snapshot.po_attainment?.length > 0,
+					co_attainment: coData,
+					indirectSummary: coData?.map((c) => ({
+						co: c.co_name,
+						directPct: c.attainment_percentage,
+						indirectPct: c.indirect_attainment_percentage,
+						finalPct: c.final_attainment_percentage,
+						directLevel: c.attainment_level,
+						finalLevel: c.final_attainment_level,
+						hasIndirect: c.indirect_attainment_level !== null,
+						isBlended: c.final_attainment_percentage !== c.attainment_percentage,
+					})),
+				});
+			} catch (snapErr) {
+				debugLogger.warn("COPOMapping", "Snapshot fetch failed (course may not be concluded)", {
+					courseId,
+					error: snapErr instanceof Error ? snapErr.message : String(snapErr),
+				});
+			}
+		} catch (error) {
+			debugLogger.error(
+				"COPOMapping",
+				"Failed to load CO-PO data",
+				error,
+			);
+			console.error("Failed to load CO-PO data:", error);
+			toast.error("Failed to load CO-PO data");
+			setLoading(false);
+		}
+	}, [courseId, selectedCohort.programmeId, selectedCohort.isRepeater]);
+
+	const saveMatrix = useCallback(async () => {
+		setSaving(true);
+		try {
+			const mappings: Array<{ co: string; po: string; value: number }> =
+				[];
+
+			Object.entries(copoMatrix).forEach(([co, pos]) => {
+				Object.entries(pos).forEach(([po, value]) => {
+					if (value > 0) {
+						mappings.push({ co, po, value });
+					}
+				});
+			});
+
+			await apiService.saveCoPoMatrix(courseId, mappings);
+			toast.success("CO-PO Matrix saved successfully");
+		} catch (error) {
+			console.error("Failed to save matrix:", error);
+			toast.error("Failed to save CO-PO Matrix");
+		} finally {
+			setSaving(false);
+		}
+	}, [courseId, copoMatrix]);
+
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const handleCSVDataParsed = useCallback((data: any[]) => {
+		setCopoMatrix((prevMatrix) => {
+			const newMatrix = JSON.parse(JSON.stringify(prevMatrix));
+			let updateCount = 0;
+
+			data.forEach((row) => {
+				let coName = "";
+				for (const key in row) {
+					const val = row[key]?.toString().trim().toUpperCase();
+					if (val && /^CO[1-6]$/i.test(val)) {
+						coName = val;
+						break;
+					}
+				}
+
+				if (!coName || !newMatrix[coName]) return;
+
+				for (const key in row) {
+					const upperKey = key.trim().toUpperCase();
+					if (upperKey.startsWith("PO") || upperKey.startsWith("PSO")) {
+						const val = parseInt(row[key]) || 0;
+						if (val >= 0 && val <= 3) {
+							if (newMatrix[coName][upperKey] !== undefined) {
+								newMatrix[coName][upperKey] = val;
+								updateCount++;
+							}
+						}
+					}
+				}
+			});
+
+			if (updateCount > 0) {
+				toast.success(
+					`Imported metadata successfully (${updateCount} values updated). Click Save to persist.`,
+				);
+				return newMatrix;
+			} else {
+				toast.warning(
+					"No valid data found in CSV matching CO/PO structure.",
+				);
+				return prevMatrix;
+			}
+		});
+	}, []);
+
+	const addThreshold = useCallback(() => {
+		setAttainmentThresholds((prev) => {
+			const newId = Math.max(...prev.map((t) => t.id), 0) + 1;
+			const lowestPercentage = Math.min(
+				...prev.map((t) => t.percentage),
+			);
+			const newPercentage = Math.max(lowestPercentage - 10, 0);
+			return [
+				...prev,
+				{ id: newId, percentage: newPercentage },
+			];
+		});
+	}, []);
+
+	const updateThreshold = useCallback((id: number, value: number) => {
+		setAttainmentThresholds((prev) =>
+			prev.map((t) =>
+				t.id === id ? { ...t, percentage: value } : t,
+			),
+		);
+	}, []);
+
+	const removeThreshold = useCallback((id: number) => {
+		setAttainmentThresholds((prev) => {
+			if (prev.length <= 1) {
+				toast.error("At least one threshold is required");
+				return prev;
+			}
+			return prev.filter((t) => t.id !== id);
+		});
+	}, []);
+
+	const saveSettings = useCallback(async () => {
+		const percentages = attainmentThresholds.map((t) => t.percentage);
+		const hasDuplicates = new Set(percentages).size !== percentages.length;
+		if (hasDuplicates) {
+			toast.error("Threshold percentages must be unique");
+			return;
+		}
+		const allValid = percentages.every((p) => p >= 0 && p <= 100);
+		if (!allValid) {
+			toast.error("All percentages must be between 0 and 100");
+			return;
+		}
+
+		try {
+		await apiService.saveAttainmentConfig({
+				offering_id: courseId,
+				co_threshold: coThreshold,
+				passing_threshold: passingThreshold,
+				direct_weightage: directWeightage,
+				indirect_weightage: indirectWeightage,
+				attainment_thresholds: attainmentThresholds.map((t) => ({
+					id: t.id,
+					percentage: t.percentage,
+				})),
+			});
+			toast.success("Settings saved successfully");
+			setShowSettings(false);
+		} catch (error) {
+			console.error("Failed to save settings:", error);
+			toast.error(
+				error instanceof Error
+					? error.message
+					: "Failed to save settings",
+			);
+		}
+	}, [courseId, coThreshold, passingThreshold, directWeightage, indirectWeightage, attainmentThresholds]);
+
+	const updateCOPOMapping = useCallback((co: string, po: string, value: number) => {
+		setCopoMatrix((prev) => ({
+			...prev,
+			[co]: {
+				...prev[co],
+				[po]: Math.max(0, Math.min(value, attainmentThresholds.length)),
+			},
+		}));
+	}, [attainmentThresholds.length]);
+
+	const zeroLevelThreshold = Math.min(
+		...attainmentThresholds.map((t) => t.percentage),
+	);
+
+	const getLevel = useCallback(
+		(percentage: number) => {
+			const sorted = [...attainmentThresholds].sort(
+				(a, b) => b.percentage - a.percentage,
+			);
+			if (sorted.length === 0) return 0;
+			if (percentage >= sorted[0].percentage) return sorted.length;
+
+			for (let i = 1; i < sorted.length; i++) {
+				if (percentage >= sorted[i].percentage) {
+					const baseLevel = sorted.length - i;
+					const basePct = sorted[i].percentage;
+					const nextPct = sorted[i - 1].percentage;
+					const diff = nextPct - basePct;
+					if (diff === 0) return baseLevel;
+					return baseLevel + (percentage - basePct) / diff;
+				}
+			}
+			return 0;
+		},
+		[attainmentThresholds],
+	);
+
+	const attainmentData = useMemo(() => {
+		const result = studentsData.length > 0
+			? calculateCOAttainment(studentsData, passingThreshold, coThreshold)
+			: null;
+		// Log live calculation for snapshot comparison
+		if (result) {
+			debugLogger.info("COPOMapping", "Live CO attainment calculated", {
+				courseId,
+				totalStudents: result.totalStudents,
+				presentStudents: result.presentStudents,
+				absentees: result.absentees,
+				coStats: {
+					CO1: result.coStats?.CO1
+						? {
+								avgPct: result.coStats.CO1.averagePercentage,
+								aboveCOThreshold: result.coStats.CO1.aboveCOThreshold,
+							}
+						: undefined,
+					CO2: result.coStats?.CO2
+						? {
+								avgPct: result.coStats.CO2.averagePercentage,
+								aboveCOThreshold: result.coStats.CO2.aboveCOThreshold,
+							}
+						: undefined,
+				},
+			});
+		}
+		return result;
+	}, [studentsData, passingThreshold, coThreshold, courseId]);
+
+	const coMaxMarks = useMemo(() => {
+		return calculateCOMaxMarks(maxMarks);
+	}, [maxMarks]);
+
+	const attainmentCriteria = useMemo(() => {
+		return getAttainmentCriteria(attainmentThresholds, zeroLevelThreshold);
+	}, [attainmentThresholds, zeroLevelThreshold]);
+
+	const handleExportAttainment = useCallback(async (headerOverrides?: {
+		programme?: string;
+		programme_id?: number;
+		year?: string;
+		semester?: string;
+		session?: string;
+	}) => {
+		try {
+			const exportStudentsData = studentsData.map((student, index) => {
+				const assessmentMarks: Record<string, Record<string, number>> = {};
+				Object.entries(student.tests).forEach(([testName, marks]) => {
+					const coMarks: Record<string, number> = {};
+					Object.entries(marks).forEach(([coName, markVal]) => {
+						coMarks[coName] = markVal || 0;
+					});
+					assessmentMarks[testName] = coMarks;
+				});
+
+				const coTotals: Record<string, number> = {};
+				Object.entries(student.coTotals).forEach(([coName, val]) => {
+					coTotals[coName] = val || 0;
+				});
+
+				return {
+					sNo: index + 1,
+					rollNo: student.rollNo,
+					name: student.name,
+					programmeName: student.programmeName,
+					absentee: student.absentee,
+					assessmentMarks,
+					coTotals: {
+						...coTotals,
+						total: student.total,
+					},
+				};
+			});
+
+			const exportAssessments = Object.entries(maxMarks).map(
+				([name, marks]) => {
+					const coMaxMarks: Record<string, number> = {};
+					Object.entries(marks).forEach(([coName, maxMarkVal]) => {
+						if (coName !== "total") {
+							coMaxMarks[coName] = maxMarkVal;
+						}
+					});
+					return {
+						name,
+						maxMarks: marks.total,
+						coMaxMarks,
+					};
+				},
+			);
+
+			const { exportAttainmentExcel } = await import("@/lib/excel/attainmentExcel");
+			await exportAttainmentExcel({
+				attainmentThresholds,
+				coThreshold,
+				passingThreshold,
+				courseCode,
+				facultyName,
+				branch: departmentName,
+				programme: headerOverrides?.programme || "B. Tech",
+				year: headerOverrides?.year || String(year),
+				semester: headerOverrides?.semester || String(semester),
+				courseName,
+				session: headerOverrides?.session || String(year),
+				studentsData: exportStudentsData,
+				assessments: exportAssessments,
+				copoMatrix: copoMatrix,
+				snapshotIndirectData: snapshotIndirectData || [],
+				directWeightage,
+				indirectWeightage,
+			});
+			toast.success("Attainment Excel downloaded");
+		} catch (error) {
+			console.error("Export failed:", error);
+			toast.error("Failed to export Excel");
+		}
+	}, [studentsData, maxMarks, attainmentThresholds, coThreshold, passingThreshold, courseCode, facultyName, departmentName, year, semester, courseName, copoMatrix, snapshotIndirectData, directWeightage, indirectWeightage]);
+
+	const poComputations = useMemo(() => {
+		if (!attainmentData) return null;
+		debugLogger.debug("COPO", "Starting calculation for tables", {
+			presentStudents: attainmentData.presentStudents,
+			thresholds: attainmentThresholds,
+		});
+
+		const result = calculatePOComputations(
+			attainmentData,
+			studentsData,
+			attainmentThresholds,
+			copoMatrix,
+			getLevel,
+		);
+
+		// Capture live averages before potential override
+		const liveAverages = { ...result.data3Point.averages };
+
+		// When snapshot has final PO values, override the 3-point scale averages
+		if (snapshotPoData && snapshotPoData.length > 0) {
+			const hasFinalValues = snapshotPoData.some(
+				(p) => p.final_attainment_value != null,
+			);
+			if (hasFinalValues) {
+				const snapshotAvg: Record<string, number> = {};
+				let sum = 0;
+				let count = 0;
+				for (const po of snapshotPoData) {
+					const val = Number(po.final_attainment_value ?? po.attainment_value);
+					snapshotAvg[po.po_name] = val;
+					sum += val;
+					count++;
+				}
+				result.data3Point.averages = snapshotAvg;
+				result.data3Point.overall = count > 0 ? sum / count : 0;
+			}
+		}
+
+		const usingSnapshot = snapshotPoData?.some(
+			(p) => p.final_attainment_value != null,
+		);
+		debugLogger.info("COPO", "PO computations prepared", {
+			overall3Point: result.data3Point.overall,
+			overallPercentage: result.dataPercentage.overall,
+			usingSnapshot,
+			liveDirectAverages: liveAverages,
+			snapshotFinalAverages: result.data3Point.averages,
+			diff: usingSnapshot
+				? Object.fromEntries(
+						Object.entries(result.data3Point.averages).map(
+							([po, final]) => [
+								po,
+								{
+									live:
+										liveAverages[po] != null
+											? Number(liveAverages[po]).toFixed(2)
+											: null,
+									final:
+										final != null
+											? Number(final).toFixed(2)
+											: null,
+									diff:
+										final != null && liveAverages[po] != null
+											? (
+													Number(final) -
+													Number(liveAverages[po])
+												).toFixed(2)
+											: null,
+								},
+							],
+						),
+					)
+				: "not-applied",
+		});
+
+		return result;
+	}, [
+		attainmentData,
+		attainmentThresholds,
+		copoMatrix,
+		getLevel,
+		studentsData,
+		snapshotPoData,
+	]);
+
+	const calculatePOAttainment = useCallback(
+		(po: string): number => {
+			if (!poComputations) return 0;
+			return poComputations.data3Point.averages[po] || 0;
+		},
+		[poComputations],
+	);
+
+	return {
+		loading,
+		studentsData,
+		maxMarks,
+		showSettings,
+		setShowSettings,
+		attainmentThresholds,
+		coThreshold,
+		setCoThreshold,
+		passingThreshold,
+		setPassingThreshold,
+		copoMatrix,
+		saving,
+		saveMatrix,
+		handleCSVDataParsed,
+		addThreshold,
+		updateThreshold,
+		removeThreshold,
+		saveSettings,
+		updateCOPOMapping,
+		getLevel,
+		attainmentData,
+		coMaxMarks,
+		attainmentCriteria,
+		handleExportAttainment,
+		poComputations,
+		calculatePOAttainment,
+		snapshotIndirectData,
+		snapshotPoData,
+		cohorts,
+		selectedCohort,
+		setSelectedCohort,
+		jobStatus,
+		loadCohortsAndJobStatus
+	};
+}

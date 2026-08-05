@@ -1,0 +1,588 @@
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, GraduationCap, X } from "lucide-react";
+import { toast } from "sonner";
+import { adminApi } from "@/services/api/admin";
+import type { Programme, Department, PaginationParams } from "@/services/api";
+import { ProgrammeList } from "@/features/programmes/ProgrammeList";
+import { ProgrammeOfferDialog } from "./ProgrammeOfferDialog";
+import { BulkEnrollStudentsDialog } from "./BulkEnrollStudentsDialog";
+import { ProgrammeCoursesDialog } from "./ProgrammeCoursesDialog";
+import { motion } from "framer-motion";
+
+const MotionButton = motion(Button);
+
+export function ProgrammesView() {
+	const [activeTab, setActiveTab] = useState<"ongoing" | "offered" | "catalog">("ongoing");
+	const [selectedDeptId, setSelectedDeptId] = useState<string>("all");
+	const [departments, setDepartments] = useState<Department[]>([]);
+	const [refreshKey, setRefreshKey] = useState(0);
+
+	// Load departments
+	useEffect(() => {
+		adminApi
+			.getAllDepartments({ limit: 100 })
+			.then((resp) => setDepartments(resp.data))
+			.catch(() => {});
+	}, []);
+
+	const triggerRefresh = useCallback(() => {
+		setRefreshKey((k) => k + 1);
+	}, []);
+
+	// Dialog states
+	const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+	const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
+	const [isCoursesDialogOpen, setIsCoursesDialogOpen] = useState(false);
+	const [isOfferDialogOpen, setIsOfferDialogOpen] = useState(false);
+	const [isEditBatchDialogOpen, setIsEditBatchDialogOpen] = useState(false);
+	const [isSubmitting, setIsSubmitting] = useState(false);
+
+	const [selectedProgramme, setSelectedProgramme] = useState<Programme | null>(null);
+
+	const [formData, setFormData] = useState({
+		programme_name: "",
+		programme_code: "",
+		department_id: "",
+		degree_level: "UG" as Programme['degree_level'],
+		duration_years: 4,
+	});
+
+	const [editFormData, setEditFormData] = useState({
+		programme_name: "",
+		programme_code: "",
+		department_id: "",
+		degree_level: "UG" as Programme['degree_level'],
+		duration_years: 4,
+	});
+
+	// Dialog opening handlers
+	const openEditDialog = (programme: Programme) => {
+		setSelectedProgramme(programme);
+		setEditFormData({
+			programme_name: programme.programme_name,
+			programme_code: programme.programme_code,
+			department_id: programme.department_id.toString(),
+			degree_level: programme.degree_level,
+			duration_years: programme.duration_years,
+		});
+		setIsEditDialogOpen(true);
+	};
+
+	const openEnrollDialog = (programme: Programme) => {
+		setSelectedProgramme(programme);
+		setIsEnrollDialogOpen(true);
+	};
+
+	const openCoursesDialog = (programme: Programme) => {
+		setSelectedProgramme(programme);
+		setIsCoursesDialogOpen(true);
+	};
+
+	const openOfferDialog = (programme: Programme) => {
+		setSelectedProgramme(programme);
+		setIsOfferDialogOpen(true);
+	};
+
+	const openEditBatchDialog = (programme: Programme) => {
+		setSelectedProgramme(programme);
+		setIsEditBatchDialogOpen(true);
+	};
+
+	// CRUD for base programmes
+	const handleCreateProgramme = async () => {
+		if (!formData.programme_name || !formData.programme_code || !formData.department_id) {
+			toast.error("Please fill in all required fields");
+			return;
+		}
+
+		setIsSubmitting(true);
+		try {
+			await adminApi.createProgramme({
+				programme_name: formData.programme_name,
+				programme_code: formData.programme_code.toUpperCase(),
+				department_id: parseInt(formData.department_id),
+				degree_level: formData.degree_level,
+				duration_years: formData.duration_years,
+			});
+			toast.success("Programme created successfully");
+			setIsAddDialogOpen(false);
+			resetForm();
+			triggerRefresh();
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to create programme");
+		} finally {
+			setIsSubmitting(false);
+		}
+	};
+
+	const handleUpdateProgramme = async () => {
+		if (!selectedProgramme) return;
+
+		if (!editFormData.programme_name || !editFormData.programme_code || !editFormData.department_id) {
+			toast.error("Please fill in all required fields");
+			return;
+		}
+
+		setIsSubmitting(true);
+		try {
+			await adminApi.updateProgramme(selectedProgramme.programme_id, {
+				programme_name: editFormData.programme_name,
+				programme_code: editFormData.programme_code.toUpperCase(),
+				department_id: parseInt(editFormData.department_id),
+				degree_level: editFormData.degree_level,
+				duration_years: editFormData.duration_years,
+			});
+			toast.success("Programme updated successfully");
+			setIsEditDialogOpen(false);
+			setSelectedProgramme(null);
+			triggerRefresh();
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to update programme");
+		} finally {
+			setIsSubmitting(false);
+		}
+	};
+
+	const handleDeleteProgramme = async (programme: Programme) => {
+		try {
+			await adminApi.deleteProgramme(programme.programme_id);
+			toast.success(`Programme "${programme.programme_name}" deleted`);
+			triggerRefresh();
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to delete programme");
+		}
+	};
+
+	// CRUD for offered batches
+	const handleOfferBatch = async (data: { batch_year: number; status: "upcoming" | "active" | "completed" }) => {
+		if (!selectedProgramme) return;
+		setIsSubmitting(true);
+		try {
+			await adminApi.createProgrammeBatch(selectedProgramme.programme_id, data);
+			toast.success("Programme offered to batch successfully");
+			setIsOfferDialogOpen(false);
+			setSelectedProgramme(null);
+			triggerRefresh();
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to offer programme");
+		} finally {
+			setIsSubmitting(false);
+		}
+	};
+
+	const handleUpdateBatch = async (data: { status: "upcoming" | "active" | "completed" }) => {
+		if (!selectedProgramme || !selectedProgramme.batch_id) return;
+		setIsSubmitting(true);
+		try {
+			await adminApi.updateProgrammeBatch(selectedProgramme.batch_id, {
+				status: data.status,
+			});
+			toast.success("Batch status updated successfully");
+			setIsEditBatchDialogOpen(false);
+			setSelectedProgramme(null);
+			triggerRefresh();
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to update batch status");
+		} finally {
+			setIsSubmitting(false);
+		}
+	};
+
+	const handleDeleteBatch = async (programme: Programme) => {
+		if (!programme.batch_id) return;
+		try {
+			await adminApi.deleteProgrammeBatch(programme.batch_id);
+			toast.success("Offered batch deleted successfully");
+			triggerRefresh();
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to delete batch offering");
+		}
+	};
+
+	const resetForm = () => {
+		setFormData({
+			programme_name: "",
+			programme_code: "",
+			department_id: "",
+			degree_level: "UG",
+			duration_years: 4,
+		});
+	};
+
+	// Data fetching functions
+	const fetchOngoing = useCallback((params: PaginationParams) => {
+		const now = new Date();
+		const academicYear = now.getMonth() < 6 ? now.getFullYear() - 1 : now.getFullYear();
+		return adminApi.getAllProgrammes({
+			limit: 20,
+			...params,
+			year: String(academicYear),
+			department_id: selectedDeptId === "all" ? undefined : selectedDeptId,
+		});
+	}, [selectedDeptId]);
+
+	const fetchOffered = useCallback((params: PaginationParams) => {
+		const now = new Date();
+		const academicYear = now.getMonth() < 6 ? now.getFullYear() - 1 : now.getFullYear();
+		return adminApi.getAllProgrammes({
+			limit: 20,
+			...params,
+			has_batches: "1",
+			batch_year_max: String(academicYear),
+			department_id: selectedDeptId === "all" ? undefined : selectedDeptId,
+		});
+	}, [selectedDeptId]);
+
+	const fetchAll = useCallback((params: PaginationParams) => {
+		return adminApi.getAllProgrammes({
+			limit: 20,
+			...params,
+			department_id: selectedDeptId === "all" ? undefined : selectedDeptId,
+		});
+	}, [selectedDeptId]);
+
+	return (
+		<motion.div
+			initial={{ opacity: 0, y: 12 }}
+			animate={{ opacity: 1, y: 0 }}
+			transition={{ type: "spring", duration: 0.5, bounce: 0.1 }}
+			className="space-y-4"
+		>
+			<motion.div
+				initial={{ opacity: 0, scale: 0.99 }}
+				animate={{ opacity: 1, scale: 1 }}
+				transition={{ delay: 0.05, duration: 0.4 }}
+				className="flex flex-wrap gap-4 items-center justify-between bg-card/60 backdrop-blur-md border border-muted/50 rounded-xl p-5 shadow-sm relative overflow-hidden mb-4"
+			>
+				<div className="absolute top-0 right-0 w-32 h-32 opacity-5 rounded-bl-full bg-indigo-500/20 pointer-events-none"></div>
+				<div className="absolute top-0 left-0 w-full h-[4px] bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+				<div className="flex items-center gap-3">
+					<div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
+						<GraduationCap className="w-5 h-5 text-white" />
+					</div>
+					<div>
+						<h3 className="text-xl font-bold tracking-tight text-foreground bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">Programmes</h3>
+						<p className="text-sm text-muted-foreground mt-0.5">
+							Manage academic programmes and offered batches
+						</p>
+					</div>
+				</div>
+				<Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+					<DialogTrigger asChild>
+						<MotionButton
+							whileHover={{ scale: 1.02, y: -1 }}
+							whileTap={{ scale: 0.98 }}
+							className="gap-2 shadow-md hover:shadow-indigo-500/10 bg-indigo-600 hover:bg-indigo-700 text-white"
+						>
+							<Plus className="w-4 h-4" />
+							Add Programme
+						</MotionButton>
+					</DialogTrigger>
+					<DialogContent className="sm:max-w-[450px] bg-card/95 backdrop-blur-md border border-muted/50 rounded-2xl shadow-xl">
+						<DialogHeader>
+							<DialogTitle className="text-xl font-bold tracking-tight">Add New Programme</DialogTitle>
+							<DialogDescription className="text-muted-foreground">Create a new academic programme</DialogDescription>
+						</DialogHeader>
+						<div className="grid gap-4 py-4">
+							<div className="space-y-2">
+								<Label htmlFor="programme_name" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Programme Name *</Label>
+								<Input
+									id="programme_name"
+									placeholder="e.g., Bachelor of Technology"
+									value={formData.programme_name}
+									onChange={(e) => setFormData({ ...formData, programme_name: e.target.value })}
+									className="bg-background/60 shadow-inner focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all duration-200"
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="programme_code" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Programme Code *</Label>
+								<Input
+									id="programme_code"
+									placeholder="e.g., BTECH"
+									value={formData.programme_code}
+									onChange={(e) => setFormData({ ...formData, programme_code: e.target.value.toUpperCase() })}
+									className="bg-background/60 shadow-inner focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all duration-200"
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="department_id" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Department *</Label>
+								<Select
+									value={formData.department_id}
+									onValueChange={(val) => setFormData({ ...formData, department_id: val })}
+								>
+									<SelectTrigger className="bg-background/60 shadow-inner focus:ring-2 focus:ring-indigo-500/20 hover:border-indigo-500/50 transition-all duration-200">
+										<SelectValue placeholder="Select a department" />
+									</SelectTrigger>
+									<SelectContent>
+										{departments.map((dept) => (
+											<SelectItem key={dept.department_id} value={dept.department_id.toString()}>
+												{dept.department_name} ({dept.department_code})
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+							<div className="grid grid-cols-2 gap-4">
+								<div className="space-y-2">
+									<Label htmlFor="degree_level" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Degree Level</Label>
+									<Select
+										value={formData.degree_level}
+										onValueChange={(val: any) => setFormData({ ...formData, degree_level: val })}
+									>
+										<SelectTrigger className="bg-background/60 shadow-inner focus:ring-2 focus:ring-indigo-500/20 hover:border-indigo-500/50 transition-all duration-200">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="UG">UG</SelectItem>
+											<SelectItem value="PG">PG</SelectItem>
+											<SelectItem value="Diploma">Diploma</SelectItem>
+											<SelectItem value="PhD">PhD</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="duration_years" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Duration (Years)</Label>
+									<Input
+										id="duration_years"
+										type="number"
+										min={1}
+										max={10}
+										value={formData.duration_years}
+										onChange={(e) => setFormData({ ...formData, duration_years: parseInt(e.target.value) })}
+										className="bg-background/60 shadow-inner focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all duration-200"
+									/>
+								</div>
+							</div>
+						</div>
+						<DialogFooter className="gap-2 sm:gap-0">
+							<Button variant="outline" onClick={() => { setIsAddDialogOpen(false); resetForm(); }} className="active:scale-95 duration-200 transition-all">Cancel</Button>
+							<Button onClick={handleCreateProgramme} disabled={isSubmitting} className="active:scale-95 duration-200 transition-all bg-indigo-600 hover:bg-indigo-700 text-white">
+								{isSubmitting ? "Creating..." : "Create Programme"}
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+			</motion.div>
+
+			<Tabs
+				value={activeTab}
+				onValueChange={(v) => setActiveTab(v as "ongoing" | "offered" | "catalog")}
+				className="w-full"
+			>
+				<div className="flex flex-wrap gap-4 items-center justify-between mb-4 bg-card/40 border border-muted/50 rounded-xl p-2 backdrop-blur-sm">
+					<TabsList className="bg-muted/50 p-1 rounded-lg">
+						<TabsTrigger value="ongoing" className="px-4 py-1.5 text-xs font-semibold rounded-md data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm transition-all duration-200">On-going Batches</TabsTrigger>
+						<TabsTrigger value="offered" className="px-4 py-1.5 text-xs font-semibold rounded-md data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm transition-all duration-200">Offered Batches</TabsTrigger>
+						<TabsTrigger value="catalog" className="px-4 py-1.5 text-xs font-semibold rounded-md data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm transition-all duration-200">Programme Catalog</TabsTrigger>
+					</TabsList>
+
+					<div className="flex items-center gap-2">
+						<Select
+							value={selectedDeptId}
+							onValueChange={(val) => setSelectedDeptId(val)}
+						>
+							<SelectTrigger className="w-[200px] bg-background/60 shadow-inner hover:border-indigo-500/50 transition-colors">
+								<SelectValue placeholder="All Departments" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All Departments</SelectItem>
+								{departments.map((dept) => (
+									<SelectItem key={dept.department_id} value={dept.department_id.toString()}>
+										{dept.department_code}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						{selectedDeptId !== "all" && (
+							<Button variant="ghost" onClick={() => setSelectedDeptId("all")} className="h-9 px-2 lg:px-3 hover:bg-destructive/10 hover:text-destructive">
+								Reset <X className="ml-2 h-4 w-4" />
+							</Button>
+						)}
+					</div>
+				</div>
+
+				<TabsContent value="ongoing" className="space-y-4">
+					<ProgrammeList
+						key={`ongoing-${selectedDeptId}-${refreshKey}`}
+						fetchFn={fetchOngoing}
+						title="On-going Batches"
+						onEdit={openEditDialog}
+						onDelete={handleDeleteProgramme}
+						onEnroll={openEnrollDialog}
+						onManageCourses={openCoursesDialog}
+						onEditBatch={openEditBatchDialog}
+						onDeleteBatch={handleDeleteBatch}
+					/>
+				</TabsContent>
+
+				<TabsContent value="offered" className="space-y-4">
+					<ProgrammeList
+						key={`offered-${selectedDeptId}-${refreshKey}`}
+						fetchFn={fetchOffered}
+						title="Offered Batches"
+						onEdit={openEditDialog}
+						onDelete={handleDeleteProgramme}
+						onEnroll={openEnrollDialog}
+						onManageCourses={openCoursesDialog}
+						onEditBatch={openEditBatchDialog}
+						onDeleteBatch={handleDeleteBatch}
+					/>
+				</TabsContent>
+
+				<TabsContent value="catalog" className="space-y-4">
+					<ProgrammeList
+						key={`catalog-${selectedDeptId}-${refreshKey}`}
+						fetchFn={fetchAll}
+						title="Programme Catalog"
+						onEdit={openEditDialog}
+						onDelete={handleDeleteProgramme}
+						onOffer={openOfferDialog}
+						onManageCourses={openCoursesDialog}
+					/>
+				</TabsContent>
+			</Tabs>
+
+			{/* Edit Dialog */}
+			<Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+				<DialogContent className="sm:max-w-[450px] bg-card/95 backdrop-blur-md border border-muted/50 rounded-2xl shadow-xl">
+					<DialogHeader>
+						<DialogTitle className="text-xl font-bold tracking-tight">Edit Programme</DialogTitle>
+						<DialogDescription className="text-muted-foreground">Update programme information</DialogDescription>
+					</DialogHeader>
+					<div className="grid gap-4 py-4">
+						<div className="space-y-2">
+							<Label htmlFor="edit_programme_name" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Programme Name *</Label>
+							<Input
+								id="edit_programme_name"
+								value={editFormData.programme_name}
+								onChange={(e) => setEditFormData({ ...editFormData, programme_name: e.target.value })}
+								className="bg-background/60 shadow-inner focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all duration-200"
+							/>
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="edit_programme_code" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Programme Code *</Label>
+							<Input
+								id="edit_programme_code"
+								value={editFormData.programme_code}
+								onChange={(e) => setEditFormData({ ...editFormData, programme_code: e.target.value.toUpperCase() })}
+								className="bg-background/60 shadow-inner focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all duration-200"
+							/>
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="edit_department_id" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Department *</Label>
+							<Select
+								value={editFormData.department_id}
+								onValueChange={(val) => setEditFormData({ ...editFormData, department_id: val })}
+							>
+								<SelectTrigger className="bg-background/60 shadow-inner focus:ring-2 focus:ring-indigo-500/20 hover:border-indigo-500/50 transition-all duration-200">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{departments.map((dept) => (
+										<SelectItem key={dept.department_id} value={dept.department_id.toString()}>
+											{dept.department_name} ({dept.department_code})
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+						<div className="grid grid-cols-2 gap-4">
+							<div className="space-y-2">
+								<Label htmlFor="edit_degree_level" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Degree Level</Label>
+								<Select
+									value={editFormData.degree_level}
+									onValueChange={(val: any) => setEditFormData({ ...editFormData, degree_level: val })}
+								>
+									<SelectTrigger className="bg-background/60 shadow-inner focus:ring-2 focus:ring-indigo-500/20 hover:border-indigo-500/50 transition-all duration-200">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="UG">UG</SelectItem>
+										<SelectItem value="PG">PG</SelectItem>
+										<SelectItem value="Diploma">Diploma</SelectItem>
+										<SelectItem value="PhD">PhD</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="edit_duration_years" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Duration (Years)</Label>
+								<Input
+									id="edit_duration_years"
+									type="number"
+									min={1}
+									max={10}
+									value={editFormData.duration_years}
+									onChange={(e) => setEditFormData({ ...editFormData, duration_years: parseInt(e.target.value) })}
+									className="bg-background/60 shadow-inner focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all duration-200"
+								/>
+							</div>
+						</div>
+					</div>
+					<DialogFooter className="gap-2 sm:gap-0">
+						<Button variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedProgramme(null); }} className="active:scale-95 duration-200 transition-all">Cancel</Button>
+						<Button onClick={handleUpdateProgramme} disabled={isSubmitting} className="active:scale-95 duration-200 transition-all bg-indigo-600 hover:bg-indigo-700 text-white">
+							{isSubmitting ? "Saving..." : "Save Changes"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Offer/Edit Batch Dialogs */}
+			<ProgrammeOfferDialog
+				mode="create"
+				open={isOfferDialogOpen}
+				onOpenChange={setIsOfferDialogOpen}
+				onSave={handleOfferBatch}
+				isLoading={isSubmitting}
+				initialData={selectedProgramme}
+			/>
+
+			<ProgrammeOfferDialog
+				mode="edit"
+				open={isEditBatchDialogOpen}
+				onOpenChange={setIsEditBatchDialogOpen}
+				onSave={handleUpdateBatch}
+				isLoading={isSubmitting}
+				initialData={selectedProgramme}
+			/>
+
+			{/* Bulk Enroll Dialog */}
+			<BulkEnrollStudentsDialog
+				open={isEnrollDialogOpen}
+				onOpenChange={setIsEnrollDialogOpen}
+				programme={selectedProgramme}
+				onSuccess={triggerRefresh}
+				api={adminApi}
+			/>
+
+			{/* Courses Dialog */}
+			<ProgrammeCoursesDialog
+				open={isCoursesDialogOpen}
+				onOpenChange={setIsCoursesDialogOpen}
+				programme={selectedProgramme}
+				onSuccess={triggerRefresh}
+			/>
+		</motion.div>
+	);
+}

@@ -1,4 +1,5 @@
 import { apiGet, apiPostFull, apiDelete } from "./base";
+import { debugLogger } from "@/lib/debugLogger";
 import type {
 	Course,
 	Test,
@@ -11,6 +12,7 @@ export const assessmentsApi = {
 	async createAssessment(
 		assessment: CreateAssessmentRequest
 	): Promise<CreateAssessmentResponse> {
+		debugLogger.info("assessmentsApi", "createAssessment called");
 		const result = await apiPostFull<
 			CreateAssessmentRequest,
 			{ test: Test; questions: QuestionResponse[] }
@@ -28,6 +30,7 @@ export const assessmentsApi = {
 		course: Course;
 		questions: QuestionResponse[];
 	}> {
+		debugLogger.info("assessmentsApi", "getAssessment called");
 		return apiGet<{
 			test: Test;
 			course: Course;
@@ -36,26 +39,19 @@ export const assessmentsApi = {
 	},
 
 	async deleteTest(testId: number): Promise<{
-		success: boolean;
-		message: string;
-		data: {
+		test_name: string;
+		course_code: string;
+		questions_deleted: number;
+		students_affected: number;
+		raw_marks_deleted: number;
+	}> {
+		debugLogger.info("assessmentsApi", "deleteTest called");
+		return apiDelete<{
 			test_name: string;
 			course_code: string;
 			questions_deleted: number;
 			students_affected: number;
 			raw_marks_deleted: number;
-		};
-	}> {
-		return apiDelete<{
-			success: boolean;
-			message: string;
-			data: {
-				test_name: string;
-				course_code: string;
-				questions_deleted: number;
-				students_affected: number;
-				raw_marks_deleted: number;
-			};
 		}>(`/tests/${testId}`);
 	},
 };

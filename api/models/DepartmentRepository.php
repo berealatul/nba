@@ -287,7 +287,7 @@ class DepartmentRepository
                     hod.employee_id AS hod_employee_id,
                     hod.username AS hod_name,
                     (SELECT COUNT(*) FROM users WHERE department_id = d.department_id AND role = 'faculty') AS faculty_count,
-                    (SELECT COUNT(*) FROM students WHERE department_id = d.department_id) AS student_count,
+                    (SELECT COUNT(*) FROM students WHERE programme_id IN (SELECT programme_id FROM programmes WHERE department_id = d.department_id)) AS student_count,
                     (SELECT COUNT(*) FROM courses WHERE department_id = d.department_id) AS course_count,
                     (SELECT COUNT(*) 
                      FROM course_offerings co 
@@ -373,15 +373,14 @@ class DepartmentRepository
                     s.school_code,
                     hod.employee_id AS hod_employee_id,
                     hod.username   AS hod_name,
-                    COALESCE(ds.faculty_count, 0)           AS faculty_count,
-                    COALESCE(ds.student_count, 0)           AS student_count,
-                    COALESCE(ds.course_count, 0)            AS course_count,
-                    COALESCE(ds.active_offerings_count, 0)  AS active_offerings_count
+                    (SELECT COUNT(*) FROM users WHERE department_id = d.department_id AND role = 'faculty') AS faculty_count,
+                    (SELECT COUNT(*) FROM students WHERE programme_id IN (SELECT programme_id FROM programmes WHERE department_id = d.department_id)) AS student_count,
+                    (SELECT COUNT(*) FROM courses WHERE department_id = d.department_id) AS course_count,
+                    (SELECT COUNT(*) FROM course_offerings co JOIN courses c ON co.course_id = c.course_id WHERE c.department_id = d.department_id AND co.year >= YEAR(CURDATE()) - 1) AS active_offerings_count
                 FROM departments d
                 LEFT JOIN schools s ON d.school_id = s.school_id
                 LEFT JOIN hod_assignments ha ON d.department_id = ha.department_id AND ha.end_date IS NULL
                 LEFT JOIN users hod ON ha.employee_id = hod.employee_id
-                LEFT JOIN department_stats ds ON d.department_id = ds.department_id
                 WHERE 1=1
             ";
             $bindings = [];
@@ -456,7 +455,7 @@ class DepartmentRepository
                     hod.username   AS hod_name,
                     (SELECT COUNT(*) FROM users u_fac WHERE u_fac.department_id = d.department_id AND u_fac.role = 'faculty') AS faculty_count,
                     (SELECT COUNT(*) FROM users u_staff WHERE u_staff.department_id = d.department_id AND u_staff.role = 'staff') AS staff_count,
-                    (SELECT COUNT(*) FROM students s WHERE s.department_id = d.department_id AND s.student_status = 'Active') AS student_count,
+                    (SELECT COUNT(*) FROM students s WHERE s.programme_id IN (SELECT programme_id FROM programmes WHERE department_id = d.department_id) AND s.student_status = 'Active') AS student_count,
                     (SELECT COUNT(*) FROM courses c WHERE c.department_id = d.department_id) AS course_count
                 FROM departments d
                 LEFT JOIN hod_assignments ha ON d.department_id = ha.department_id AND ha.end_date IS NULL
